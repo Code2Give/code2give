@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  DONOR
+  GOV
+  ADMIN
+}
+
+model Stakeholder {
+  id        String   @id @default(cuid())
+  role      Role     @default(DONOR)
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Pantry {
+  id          String   @id @default(cuid())
+  name        String
+  location    String
+  latitude    Float?
+  longitude   Float?
+  hours       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  text      String
+  sentiment String?
+  tags      String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CensusData {
+  id           String   @id @default(cuid())
+  tractId      String   @unique
+  povertyIndex Float
+  population   Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
