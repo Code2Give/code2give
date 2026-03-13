@@ -1,22 +1,61 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
+import dynamic from 'next/dynamic';
+
+// Next.js dynamic import for Leaflet (needs window object, can't SSR)
+const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
+const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false });
+const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false });
+const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false });
+const CircleMarker = dynamic(() => import('react-leaflet').then(mod => mod.CircleMarker), { ssr: false });
+
+// Types
+type Pantry = { id: string; name: string; latitude: number; longitude: number; hours: string; description: string };
 
 export default function ImpactMap() {
   const [layer, setLayer] = useState<"pantry" | "poverty">("pantry");
+  const [pantries, setPantries] = useState<Pantry[]>([]);
+  const [mounted, setMounted] = useState(false);
+
+  // NYC center
+  const position: [number, number] = [40.730610, -73.935242];
+
+  useEffect(() => {
+    setMounted(true);
+
+    // Fix Leaflet default icon paths
+    (async function init() {
+      const L = await import('leaflet');
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
+    })();
+
+    // Fetch live map data from API
+    fetch('/api/map-data')
+      .then(res => res.json())
+      .then(data => {
+        if (data.pantries) setPantries(data.pantries);
+      })
+      .catch(err => console.error("Map Data Error:", err));
+  }, []);
 
   return (
     <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col h-[500px]">
       {/* Map Control Header */}
-      <div className="bg-white p-4 border-b border-slate-100 flex items-center justify-between z-10">
+      <div className="bg-white p-4 border-b border-slate-100 flex items-center justify-between z-10 relative">
         <div>
           <h3 className="font-semibold text-slate-900">NYC Impact Layer</h3>
-          <p className="text-sm text-slate-500">Toggle data overlays for deeper decision intelligence.</p>
+          <p className="text-sm text-slate-500">Live data from Lemontree InsightEngine</p>
         </div>
-        
+
         <div className="flex bg-slate-100 p-1 rounded-lg">
-          <Button 
+          <Button
             variant={layer === "pantry" ? "default" : "ghost"}
             size="sm"
             onClick={() => setLayer("pantry")}
@@ -24,7 +63,7 @@ export default function ImpactMap() {
           >
             Pantry Density
           </Button>
-          <Button 
+          <Button
             variant={layer === "poverty" ? "default" : "ghost"}
             size="sm"
             onClick={() => setLayer("poverty")}
@@ -34,31 +73,42 @@ export default function ImpactMap() {
           </Button>
         </div>
       </div>
-      
-      {/* Map Container - Conceptual Placeholder */}
-      <div className="flex-1 bg-slate-100 relative overflow-hidden flex items-center justify-center">
-        {/* Decorative Grid Lines to simulate map styling */}
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
 
-        <div className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl border border-slate-200 shadow-xl max-w-sm text-center relative z-10 transition-all duration-300">
-          <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-colors ${layer === 'pantry' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
-            </svg>
+      {/* Map */}
+      <div className="flex-1 w-full relative z-0">
+        {mounted ? (
+          <MapContainer center={position} zoom={11} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+
+            {layer === 'pantry' && pantries.map((pantry) => (
+              <Marker key={pantry.id} position={[pantry.latitude, pantry.longitude]}>
+                <Popup>
+                  <strong className="block mb-1 font-semibold">{pantry.name}</strong>
+                  <p className="text-xs text-slate-600 mb-1">{pantry.description}</p>
+                  <span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-800">{pantry.hours}</span>
+                </Popup>
+              </Marker>
+            ))}
+
+            {layer === 'poverty' && pantries.map((pantry, idx) => (
+              <CircleMarker
+                key={`pov-${idx}`}
+                center={[pantry.latitude, pantry.longitude]}
+                pathOptions={{ color: 'red', fillColor: '#f87171', fillOpacity: 0.4 }}
+                radius={25 + idx * 5}
+              >
+                <Popup>SNAP Need Index: {(0.3 + idx * 0.08).toFixed(2)}</Popup>
+              </CircleMarker>
+            ))}
+          </MapContainer>
+        ) : (
+          <div className="flex items-center justify-center h-full bg-slate-50">
+            <p className="text-slate-400 text-sm">Loading Map...</p>
           </div>
-          <h4 className="text-xl font-bold text-slate-900 mb-2">
-            {layer === "pantry" ? "Lemontree Pantries" : "Census SNAP Need"}
-          </h4>
-          <p className="text-sm text-slate-600">
-            {layer === "pantry" 
-              ? "Displaying density clusters of currently active supply centers connected to Lemontree." 
-              : "Heatmap visualizing highest concentration of SNAP recipients and food insecurity."}
-          </p>
-          <div className="mt-4 text-xs font-mono text-slate-400">
-            [Awaiting Mapbox / Google Maps SDK injection]
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

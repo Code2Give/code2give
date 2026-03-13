@@ -12,11 +12,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-import { PersonaProvider } from "@/components/layout/PersonaWrapper";
-
 export const metadata: Metadata = {
   title: "Lemontree InsightEngine",
-  description: "Dashboard layering food pantry data with NYC Census demographics",
+  description: "Food insecurity data intelligence platform — Morgan Stanley Code to Give 2026",
 };
 
 export default function RootLayout({
@@ -26,12 +24,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <PersonaProvider>
-          {children}
-        </PersonaProvider>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        {children}
       </body>
     </html>
   );
