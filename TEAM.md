@@ -21,6 +21,7 @@ By layering Lemontree's qualitative feedback with NYC Census data, we move from 
 | Database | PostgreSQL via Prisma 7 (embedded local dev server) |
 | DB Client | Raw `pg` driver (direct connection) |
 | Map | React-Leaflet + OpenStreetMap tiles |
+| Charts | Recharts |
 | AI | Google Gemini API (`gemini-2.0-flash`) with keyword fallback |
 | Icons | Lucide React |
 | Runtime | Node.js 25 |
@@ -59,50 +60,60 @@ GEMINI_API_KEY=""           # add your key here to enable real AI
 
 ---
 
-## What's Built (Current V1)
+## What's Built (Current V2 — Figma Design Integrated)
 
-### Persona Switcher
-A dropdown in the top bar lets you switch between three dashboard views instantly — no login required. Defaults to Donor on load.
+The UI has been fully rebuilt to match the team's Figma design. The old persona-based dashboards have been replaced with a unified multi-page app shell.
 
-| Persona | Route | Who it's for |
-|---|---|---|
-| Donor | (default) | Donors tracking ROI |
-| Gov (City Planner) | switcher | City agencies identifying food deserts |
-| Admin (Lemontree) | switcher | Lemontree ops team |
+### App Layout
 
----
+A persistent sidebar + top nav wraps all pages.
 
-### Donor Dashboard
-- **4 metric cards** — Meals Provided, Community Reach, Active Pantries, ROI per $100
-- **Interactive NYC Map** — live pantry locations pulled from DB, toggleable layers
-- Status: metric cards are hardcoded mock values; map is live
+- **Sidebar** — 7 nav items, highlights active page
+- **Role switcher** — top-right dropdown, 4 roles, switches context instantly (no login required)
 
----
-
-### Gov / City Planner Dashboard
-- **3 metric cards** — Critical Priority Tracts, SNAP Need Met %, New Pantries Needed
-- **Interactive NYC Map** — same live map component
-- Status: metric cards are hardcoded mock values; map is live
+| Role | Who it's for |
+|---|---|
+| Lemontree Team | Lemontree ops/admin |
+| Government Agency | City planners identifying food deserts |
+| Donor / Foundation | Donors tracking ROI and impact |
+| Food Provider | Pantry/food bank managers |
 
 ---
 
-### Admin / Lemontree Dashboard
-**This is the most complete view.**
+### Pages
 
-- **Live stats bar** — Total feedback processed, Positive count, Negative count (all computed from DB in real time)
-- **AI Demo form** — type any feedback text, hit "Analyze with AI", it classifies and saves to DB immediately
-- **Live feedback feed** — streams the last 20 feedback entries from DB, each showing timestamp, sentiment badge, and category tags
-- **Reliability Score widget** — donut chart showing a composite Operating Reliability Score (formula: `Qualitative AI Grade × 0.6 + Hours Consistency × 0.4`)
-- Status: stats and feed are fully live; Reliability Score uses hardcoded constants (not yet computed from DB)
+#### Overview
+- **4 KPI cards** — Feedback Processed, Active Pantries, Positive Sentiment %, Needs Attention count — all pulled live from DB
+- **Active Pantry list** — live from DB, with hours and status badges
+- **Recent Feedback feed** — last 6 entries from DB with sentiment badges
+- **Wait Time & Report Trends** — Recharts line chart (mock trend data)
 
----
+#### Food Resource Map
+- Interactive Leaflet map with pantry markers (live from DB)
+- Clicking a marker shows pantry name, hours, and description
+- Resource list below the map with status chips
 
-### Interactive Impact Map
-- Renders via React-Leaflet (client-side only, no SSR)
-- **Layer toggle:**
-  - **Pantry Density** — pin markers for each pantry, clicking shows name, description, hours
-  - **Poverty SNAP Need** — red circle overlays (currently uses pantry coordinates as proxy — Census layer not yet wired)
-- Pantry data is fetched live from the DB on every page load
+#### Community Reports
+- Live feedback feed from DB with search + filter (by category)
+- AI feedback submission form — type text, hit "Analyze", classifies and saves to DB instantly
+- Each card shows sentiment badge, category tags, timestamp
+
+#### Trends & Analytics
+- **4 insight summary cards** — Report Volume, Avg Wait Time, Peak Day, Food Availability
+- **Wait Time & Report Volume line chart** — dual-axis Recharts chart
+- **Demand by Borough bar chart** — weekly report counts per borough
+- **Food Availability trends line chart** — produce/meat/staples over 4 weeks
+
+#### Service Issues
+- **3 summary cards** — Active Issues, Monitoring, Resolved This Week
+- Issue cards grouped by status (active / monitoring / resolved) with severity badges
+- Negative community feedback section — live from DB, AI-classified as negative/critical
+
+#### Food Availability
+- Placeholder page (real-time inventory tracking marked as coming soon)
+
+#### Settings
+- Current role info, notification toggles, data/privacy statement, system info
 
 ---
 
@@ -143,20 +154,21 @@ CensusData    — id, tractId, povertyIndex, population
 ## What's Left / To-Do
 
 ### High priority (for the demo)
-- [ ] **Wire Reliability Score to real DB data** — query Feedback table, compute average sentiment score per pantry, display live in the widget
-- [ ] **Wire Donor + Gov metric cards to DB** — replace hardcoded numbers with real counts from Pantry and Feedback tables
-- [ ] **Poverty layer from CensusData** — map the actual `povertyIndex` values from the DB onto the map as proper circle overlays
+- [ ] **Wire KPI cards to real DB computations** — Feedback Processed, Positive Sentiment % should be calculated server-side from the Feedback table
+- [ ] **Poverty / Census layer on the map** — map the actual `povertyIndex` values from CensusData onto the map as circle overlays
+- [ ] **Role-aware page content** — currently the role switcher changes the label but not the page data; Donor/Gov/Provider views should show different KPIs and filtered data
 - [ ] **Add Gemini API key** — one line in `.env`, activates real AI for the demo
 
 ### Medium priority
-- [ ] **Client persona** (food seeker view) — "Where can I get food quickly?" — simple pantry finder by borough
-- [ ] **Pantry persona** (food bank manager) — "How is my pantry performing?" — shows feedback specific to their location, their reliability score
-- [ ] **Real NYC Open Data** — replace mock census/SNAP data with actual NYC Open Data API calls
+- [ ] **Real NYC Open Data** — replace mock trend/demand data with actual NYC Open Data API calls
+- [ ] **Food Availability page** — wire real pantry inventory data (if Lemontree has it)
+- [ ] **Per-pantry breakdown** — filter Community Reports by pantry name
+- [ ] **Reliability Score widget** — bring back the donut chart showing a composite Operating Reliability Score per pantry
 
 ### Nice to have
 - [ ] `.env.example` file for onboarding teammates
-- [ ] Per-pantry feedback breakdown — filter feed by pantry name
-- [ ] Tag frequency chart — bar chart of most common feedback categories (Wait Time, Food Quality, etc.)
+- [ ] Tag frequency bar chart — most common feedback categories
+- [ ] Export reports as CSV/PDF
 
 ---
 
@@ -165,20 +177,25 @@ CensusData    — id, tractId, povertyIndex, population
 ```
 src/
   app/
-    page.tsx                          — main page, persona routing
-    layout.tsx                        — wraps app in PersonaProvider
+    page.tsx                          — app entry, renders AppLayout + page switcher
+    layout.tsx                        — root HTML shell (no provider needed)
     api/
       map-data/route.ts               — GET pantries + census from DB
       analyze-feedback/route.ts       — GET/POST feedback with AI
   components/
     layout/
-      PersonaWrapper.tsx              — persona context + top switcher bar
+      AppLayout.tsx                   — sidebar, top nav, role/page context
     dashboard/
-      DonorDashboard.tsx              — donor view
-      GovDashboard.tsx                — city planner view
-      AdminDashboard.tsx              — lemontree admin view (most complete)
-      ImpactMap.tsx                   — leaflet map with layer toggle
-      ReliabilityScore.tsx            — donut chart widget
+      KPICard.tsx                     — reusable metric card component
+      ImpactMap.tsx                   — leaflet map (legacy, kept for reference)
+      ReliabilityScore.tsx            — donut chart widget (legacy)
+    pages/
+      OverviewPage.tsx                — KPIs + pantry list + feedback feed + chart
+      FoodResourceMapPage.tsx         — Leaflet map wired to DB
+      CommunityReportsPage.tsx        — live feedback + AI submit form
+      TrendsPage.tsx                  — Recharts analytics charts
+      ServiceIssuesPage.tsx           — service disruptions + negative feedback
+      SettingsPage.tsx                — role info + settings UI
     ui/
       Badge.tsx / Button.tsx / Card.tsx
 
@@ -188,17 +205,20 @@ src/
 prisma/
   schema.prisma                       — DB schema (4 models)
   seed.ts                             — NYC mock data seeder
+
+design_temp/                          — teammate's Figma Make export (reference only)
 ```
 
 ---
 
 ## The "Winning" Feature to Highlight in the Demo
 
-**The Reliability Score** — judges will ask "what's *new* here?" The answer is this metric. It's not data Lemontree already had. It's a synthesized insight generated by layering:
-1. LLM-extracted sentiment from unstructured human feedback
-2. Operational consistency data (hours)
+**The AI-powered Feedback Intelligence pipeline.** Judges will ask "what's *new* here?" The answer is the combination of:
+1. Unstructured community feedback → structured sentiment + category signals via Gemini AI
+2. Real pantry location data overlaid on a live map
+3. Role-specific dashboards that show the same data through different lenses (Lemontree ops vs. city planner vs. donor)
 
-Frame it as: *"We didn't just display Lemontree's data. We created a new signal that didn't exist before."*
+Frame it as: *"We didn't just display Lemontree's data. We created new signals from qualitative human feedback that didn't exist before — and we made them actionable for four different audiences in one unified dashboard."*
 
 ---
 
@@ -206,6 +226,6 @@ Frame it as: *"We didn't just display Lemontree's data. We created a new signal 
 
 | Squad | Focus | Key files |
 |---|---|---|
-| **A — Data/AI** | Wire CensusData to map poverty layer, add real NYC Open Data, activate Gemini key | `ImpactMap.tsx`, `api/map-data/route.ts`, `prisma/seed.ts` |
-| **B — Dashboard** | Wire Reliability Score to DB, wire Donor/Gov metric cards to DB, build Client + Pantry persona views | `DonorDashboard.tsx`, `GovDashboard.tsx`, `ReliabilityScore.tsx`, new persona files |
+| **A — Data/AI** | Wire CensusData to map poverty layer, add real NYC Open Data, activate Gemini key, compute DB-driven KPIs | `api/map-data/route.ts`, `OverviewPage.tsx`, `prisma/seed.ts` |
+| **B — Dashboard** | Role-aware page content, Reliability Score widget, Food Availability page | `AppLayout.tsx`, `OverviewPage.tsx`, `SettingsPage.tsx` |
 | **C — Pitch/Docs** | Demo video, judge narrative, polish this doc, README | `README.md`, slide deck, video |
