@@ -1,0 +1,149 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useApp } from "@/components/layout/AppLayout";
+import { KPICard } from "@/components/dashboard/KPICard";
+import {
+  FileText, MapPin, Clock, AlertTriangle,
+  Users, TrendingUp, DollarSign, BarChart3,
+} from "lucide-react";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer,
+} from "recharts";
+
+type Pantry = { id: string; name: string; latitude: number; longitude: number; hours: string; description: string };
+type FeedbackItem = { id: string; text: string; sentiment: string; tags: string[]; createdAt: string };
+
+const waitTimeTrends = [
+  { date: "Mar 6", avgWait: 25, reports: 45 },
+  { date: "Mar 7", avgWait: 28, reports: 52 },
+  { date: "Mar 8", avgWait: 22, reports: 48 },
+  { date: "Mar 9", avgWait: 30, reports: 55 },
+  { date: "Mar 10", avgWait: 27, reports: 50 },
+  { date: "Mar 11", avgWait: 32, reports: 58 },
+  { date: "Mar 12", avgWait: 29, reports: 54 },
+  { date: "Mar 13", avgWait: 31, reports: 60 },
+];
+
+export function OverviewPage() {
+  const { role } = useApp();
+  const [pantries, setPantries] = useState<Pantry[]>([]);
+  const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+
+  useEffect(() => {
+    fetch("/api/map-data").then(r => r.json()).then(d => setPantries(d.pantries || []));
+    fetch("/api/analyze-feedback").then(r => r.json()).then(d => setFeedback(d.feedback || []));
+  }, []);
+
+  const positive = feedback.filter(f => f.sentiment === "Positive").length;
+  const negative = feedback.filter(f => f.sentiment === "Negative").length;
+  const issues = feedback.filter(f => f.sentiment === "Negative").length;
+
+  const renderKPIs = () => {
+    switch (role) {
+      case "internal":
+        return (
+          <>
+            <KPICard title="Feedback Processed" value={feedback.length} icon={FileText} trend={{ value: 24, isPositive: true }} />
+            <KPICard title="Active Pantries" value={pantries.length} icon={MapPin} />
+            <KPICard title="Positive Sentiment" value={`${feedback.length > 0 ? Math.round((positive / feedback.length) * 100) : 0}%`} icon={BarChart3} trend={{ value: 8, isPositive: true }} />
+            <KPICard title="Needs Attention" value={negative} icon={AlertTriangle} subtitle="Negative feedback" />
+          </>
+        );
+      case "government":
+        return (
+          <>
+            <KPICard title="Pantries Mapped" value={pantries.length} icon={MapPin} />
+            <KPICard title="Demand Growth" value="18%" icon={TrendingUp} trend={{ value: 18, isPositive: true }} />
+            <KPICard title="Feedback Reports" value={feedback.length} icon={BarChart3} />
+            <KPICard title="Service Gaps" value={issues} icon={AlertTriangle} />
+          </>
+        );
+      case "donor":
+        return (
+          <>
+            <KPICard title="Communities Served" value="12 Neighborhoods" icon={Users} />
+            <KPICard title="Demand Growth" value="18%" icon={TrendingUp} trend={{ value: 18, isPositive: true }} />
+            <KPICard title="Satisfaction Rate" value={`${feedback.length > 0 ? Math.round((positive / feedback.length) * 100) : 0}%`} icon={BarChart3} />
+            <KPICard title="Funding Opportunities" value={issues} icon={DollarSign} subtitle="High-need sites" />
+          </>
+        );
+      case "provider":
+        return (
+          <>
+            <KPICard title="Reports This Week" value={60} icon={FileText} trend={{ value: 12, isPositive: true }} />
+            <KPICard title="Avg Wait Time" value="31 min" icon={Clock} trend={{ value: 8, isPositive: false }} />
+            <KPICard title="Satisfaction Rate" value={`${feedback.length > 0 ? Math.round((positive / feedback.length) * 100) : 0}%`} icon={BarChart3} />
+            <KPICard title="Active Alerts" value={negative} icon={AlertTriangle} />
+          </>
+        );
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-4 gap-6">{renderKPIs()}</div>
+
+      <div className="grid grid-cols-3 gap-6">
+        {/* Pantry summary */}
+        <div className="col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="mb-4 text-gray-900">Active Pantry Locations</h2>
+          <div className="space-y-3">
+            {pantries.map((p) => (
+              <div key={p.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{p.hours}</p>
+                </div>
+                <span className="px-2 py-1 text-xs rounded-full bg-[#2E7D32]/10 text-[#2E7D32]">Active</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent Feedback */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h3 className="mb-4 text-gray-900">Recent Feedback</h3>
+          <div className="space-y-4">
+            {feedback.slice(0, 4).map((fb) => (
+              <div key={fb.id} className="border-b border-gray-100 pb-3 last:border-0">
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    fb.sentiment === "Positive" ? "bg-green-100 text-green-800" :
+                    fb.sentiment === "Negative" ? "bg-red-100 text-red-800" :
+                    "bg-gray-100 text-gray-700"
+                  }`}>{fb.sentiment}</span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(fb.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-700 line-clamp-2">{fb.text}</p>
+                <div className="flex gap-1 mt-1 flex-wrap">
+                  {fb.tags?.map((t) => (
+                    <span key={t} className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{t}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Trends Chart */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="mb-4 text-gray-900">Wait Time & Report Trends</h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={waitTimeTrends}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="date" stroke="#6b7280" />
+            <YAxis stroke="#6b7280" />
+            <Tooltip contentStyle={{ backgroundColor: "white", border: "1px solid #e5e7eb", borderRadius: "8px" }} />
+            <Line type="monotone" dataKey="avgWait" stroke="#2E7D32" strokeWidth={2} name="Avg Wait (min)" dot={{ fill: "#2E7D32" }} />
+            <Line type="monotone" dataKey="reports" stroke="#42A5F5" strokeWidth={2} name="Reports" dot={{ fill: "#42A5F5" }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}

@@ -1,70 +1,49 @@
 "use client";
 
-import { usePersona } from "@/components/layout/PersonaWrapper";
-import DonorDashboard from "@/components/dashboard/DonorDashboard";
-import GovDashboard from "@/components/dashboard/GovDashboard";
-import AdminDashboard from "@/components/dashboard/AdminDashboard";
-import { LayoutDashboard, Users, HeartHandshake, Settings, LogOut } from "lucide-react";
+import { AppLayout, useApp } from "@/components/layout/AppLayout";
+import { OverviewPage } from "@/components/pages/OverviewPage";
+import { FoodResourceMapPage } from "@/components/pages/FoodResourceMapPage";
+import { CommunityReportsPage } from "@/components/pages/CommunityReportsPage";
+import { TrendsPage } from "@/components/pages/TrendsPage";
+import { ServiceIssuesPage } from "@/components/pages/ServiceIssuesPage";
+import { SettingsPage } from "@/components/pages/SettingsPage";
+
+function PageContent() {
+  const { page } = useApp();
+
+  switch (page) {
+    case "overview":
+      return <OverviewPage />;
+    case "map":
+      return <FoodResourceMapPage />;
+    case "reports":
+      return <CommunityReportsPage />;
+    case "trends":
+      return <TrendsPage />;
+    case "issues":
+      return <ServiceIssuesPage />;
+    case "settings":
+      return <SettingsPage />;
+    case "availability":
+      return (
+        <div className="space-y-6">
+          <h1 className="text-gray-900">Food Availability</h1>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+            <p className="text-gray-500">
+              Real-time inventory tracking coming soon. Check the Trends page for weekly availability data.
+            </p>
+          </div>
+        </div>
+      );
+    default:
+      return <OverviewPage />;
+  }
+}
 
 export default function Home() {
-  const { role } = usePersona();
-
   return (
-    <div className="flex bg-slate-50 min-h-screen">
-      {/* Sidebar Navigation (Morgan Stanley-grade sleek dark look) */}
-      <aside className="w-64 bg-slate-950 text-slate-300 hidden md:flex flex-col border-r border-slate-800">
-        <div className="p-6 flex items-center gap-2 border-b border-slate-800/50">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500 font-bold text-white flex items-center justify-center shrink-0">
-            LI
-          </div>
-          <span className="font-semibold text-slate-100 tracking-wide">InsightEngine</span>
-        </div>
-        
-        <nav className="flex-1 p-4 space-y-1">
-          <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-md bg-slate-900 text-emerald-400 font-medium transition-colors">
-            <LayoutDashboard size={20} />
-            Overview
-          </a>
-          <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-900/50 hover:text-slate-100 transition-colors">
-            <HeartHandshake size={20} />
-            Impact Metrics
-          </a>
-          <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-900/50 hover:text-slate-100 transition-colors">
-            <Users size={20} />
-            Demographics
-          </a>
-        </nav>
-
-        <div className="p-4 border-t border-slate-800/50 space-y-1">
-          <a href="#" className="flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-slate-900/50 hover:text-slate-100 transition-colors">
-            <Settings size={18} />
-            Settings
-          </a>
-          <a href="#" className="flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-slate-900/50 hover:text-slate-100 transition-colors">
-            <LogOut size={18} />
-            Sign Out
-          </a>
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 w-full flex flex-col min-w-0">
-        {/* Header */}
-        <header className="h-16 border-b border-slate-200 bg-white flex items-center px-6 sticky top-0 z-10">
-          <div className="flex items-center text-sm font-medium text-slate-500">
-             Overview / <span className="text-slate-900 ml-1">Dashboard</span>
-          </div>
-        </header>
-
-        {/* Dashboard Dynamic Routing based on Persona */}
-        <div className="flex-1 p-6 lg:p-10 overflow-auto">
-          <div className="max-w-7xl mx-auto">
-            {role === "DONOR" && <DonorDashboard />}
-            {role === "GOV" && <GovDashboard />}
-            {role === "ADMIN" && <AdminDashboard />}
-          </div>
-        </div>
-      </main>
-    </div>
+    <AppLayout>
+      <PageContent />
+    </AppLayout>
   );
 }
