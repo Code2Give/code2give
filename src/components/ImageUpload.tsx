@@ -267,7 +267,7 @@ export default function ImageUpload() {
           <button
             onClick={handleSubmit}
             disabled={isUploading || !selectedFile}
-            className="flex-1 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold
+            className="flex-1nnpy-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold
               hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed
               transition-all duration-150 flex items-center justify-center gap-2"
           >
