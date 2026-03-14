@@ -1,3 +1,9 @@
+// Local development workflow:
+//   - Generate client: `npx prisma generate`
+//   - Create & apply a new migration to your *local/dev* DB: `npx prisma migrate dev --name <message>`
+// For Supabase / remote (e.g. prod) environments, apply existing migrations with: `npx prisma migrate deploy`
+// To update this schema from an existing Supabase database, use: `npx prisma db pull`
+
 generator client {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/client"
