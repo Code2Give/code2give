@@ -56,3 +56,4 @@ code2give-490104-e1f995f7d2aa.json
 # ML pipeline
 ml/cache/
 ml/*.csv
+ml/output/*
