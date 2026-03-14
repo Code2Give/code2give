@@ -10,6 +10,8 @@ import { SettingsPage } from "@/components/pages/SettingsPage";
 import { DataTablePage } from "@/components/pages/DataTablePage";
 import { FoodAvailabilityPage } from "@/components/pages/FoodAvailabilityPage";
 import { ReliabilityPage } from "@/components/pages/ReliabilityPage";
+import { ClientHomePage } from "@/components/pages/ClientHomePage";
+import { ClientUploadPage } from "@/components/pages/ClientUploadPage";
 
 function PageContent() {
   const { page } = useApp();
@@ -27,6 +29,10 @@ function PageContent() {
       return <ServiceIssuesPage />;
     case "table":
       return <DataTablePage />;
+    case "client-home":
+      return <ClientHomePage />;
+    case "client-upload":
+      return <ClientUploadPage />;
     case "settings":
       return <SettingsPage />;
     case "reliability":

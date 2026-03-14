@@ -1,13 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import {
   LayoutDashboard, MapPin, FileText, TrendingUp,
-  Apple, AlertTriangle, Settings, ChevronDown, User, Leaf, PanelLeftClose, PanelLeftOpen, Table2, Star,
+  Apple, AlertTriangle, Settings, ChevronDown, User, Leaf, PanelLeftClose, PanelLeftOpen, Table2, Star, Camera, Home,
 } from "lucide-react";
 
-export type UserRole = "internal" | "government" | "donor" | "provider";
-export type PageId = "overview" | "map" | "reports" | "trends" | "reliability" | "availability" | "issues" | "settings" | "table";
+export type UserRole = "internal" | "government" | "donor" | "provider" | "client";
+export type PageId = "overview" | "map" | "reports" | "trends" | "reliability" | "availability" | "issues" | "settings" | "table" | "client-home" | "client-upload";
 
 interface AppContextType {
   role: UserRole;
@@ -29,7 +29,15 @@ const roleLabels: Record<UserRole, string> = {
   government: "Government Agency",
   donor: "Donor / Foundation",
   provider: "Food Provider",
+  client: "Client",
 };
+
+const clientNavItems: { id: PageId; label: string; icon: React.ElementType }[] = [
+  { id: "client-home", label: "Home", icon: Home },
+  { id: "map", label: "Find Food Resources", icon: MapPin },
+  { id: "client-upload", label: "Submit a Photo", icon: Camera },
+  { id: "settings", label: "Settings", icon: Settings },
+];
 
 const navItems: { id: PageId; label: string; icon: React.ElementType }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -43,12 +51,15 @@ const navItems: { id: PageId; label: string; icon: React.ElementType }[] = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-function Sidebar({ page, setPage, collapsed, setCollapsed }: {
+function Sidebar({ page, setPage, collapsed, setCollapsed, role }: {
   page: PageId;
   setPage: (p: PageId) => void;
   collapsed: boolean;
   setCollapsed: (v: boolean) => void;
+  role: UserRole;
 }) {
+  const items = role === "client" ? clientNavItems : navItems;
+
   return (
     <aside className={`${collapsed ? "w-16" : "w-64"} bg-card border-r border-gray-200 flex flex-col fixed left-0 top-16 bottom-0 z-20 transition-all duration-300`}>
       <div className={`p-4 border-b border-gray-200 flex items-center ${collapsed ? "justify-center" : "justify-between"}`}>
@@ -62,7 +73,7 @@ function Sidebar({ page, setPage, collapsed, setCollapsed }: {
       </div>
       <nav className="flex-1 overflow-y-auto p-2">
         <div className="space-y-1">
-          {navItems.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
             const isActive = page === item.id;
             return (
@@ -137,8 +148,24 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [page, setPage] = useState<PageId>("overview");
   const [collapsed, setCollapsed] = useState(false);
 
+  const handleSetRole = (r: UserRole) => {
+    setRole(r);
+    if (r === "client") {
+      setPage("client-home");
+    } else {
+      setPage("overview");
+    }
+  };
+
+  // Guard: if a client-only page is active for a non-client role, redirect
+  useEffect(() => {
+    if (role !== "client" && (page === "client-home" || page === "client-upload")) {
+      setPage("overview");
+    }
+  }, [role, page]);
+
   return (
-    <AppContext.Provider value={{ role, setRole, page, setPage }}>
+    <AppContext.Provider value={{ role, setRole: handleSetRole, page, setPage }}>
       <div className="min-h-screen bg-background flex flex-col">
         <div className="fixed top-0 left-0 right-0 h-16 bg-[#FFCC10] z-30 flex items-center justify-center px-6 gap-3">
           <div className="h-8 w-8 flex items-center justify-center overflow-hidden">
@@ -148,8 +175,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <img src="/lemontreeText.png" alt="Lemontree Text" className="h-full w-auto object-contain" />
           </div>
         </div>
-        <Sidebar page={page} setPage={setPage} collapsed={collapsed} setCollapsed={setCollapsed} />
-        <TopNav role={role} setRole={setRole} collapsed={collapsed} />
+        <Sidebar page={page} setPage={setPage} collapsed={collapsed} setCollapsed={setCollapsed} role={role} />
+        <TopNav role={role} setRole={handleSetRole} collapsed={collapsed} />
         <main className={`${collapsed ? "ml-16" : "ml-64"} pt-32 transition-all duration-300`}>
           <div className="p-8">
             {children}
