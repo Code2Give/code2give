@@ -55,7 +55,6 @@ model Resource {
   syncedAt               DateTime    @default(now())
   createdAt              DateTime    @default(now())
   updatedAt              DateTime    @updatedAt
-  censusData             CensusData? @relation(fields: [tractId], references: [tractId])
   feedback               Feedback[]
 }
 
@@ -83,13 +82,12 @@ model Pantry {
 }
 
 model CensusData {
-  id           String     @id @default(cuid())
-  tractId      String     @unique
+  id           String   @id @default(cuid())
+  tractId      String   @unique
   povertyIndex Float
   population   Int?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  resources    Resource[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 enum Role {

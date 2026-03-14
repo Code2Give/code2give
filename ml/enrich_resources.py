@@ -7,7 +7,7 @@ It calls the Census geocoder for any Resource that doesn't have a tractId yet,
 then batch-updates the Resource table in Supabase.
 
 Run:
-    pip install psycopg2 pandas requests python-dotenv tqdm
+    pip install psycopg2 requests python-dotenv tqdm
     cd ml
     python enrich_resources.py
 
@@ -16,7 +16,9 @@ Run:
 """
 
 import os
+import time
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import psycopg2
 import psycopg2.extras
 import requests
@@ -29,26 +31,55 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env.local")
 DB_URL = os.getenv("DIRECT_URL", "").strip('"')
 CENSUS_GEOCODER_URL = "https://geocoding.geo.census.gov/geocoder/geographies/coordinates"
 
+MAX_WORKERS    = 10   # concurrent geocoder requests (keep moderate to avoid throttle)
+CHUNK_SIZE     = 100  # process this many resources per batch
+PAUSE_BETWEEN  = 1.0  # seconds to pause between chunks
+
 
 def geocode_tract_id(lat, lon):
     """
     Call Census geocoder with lat/lng → return FIPS tract ID string, or None.
+    Retries once on failure.
     """
-    try:
-        resp = requests.get(CENSUS_GEOCODER_URL, params={
-            "x": lon, "y": lat,
-            "benchmark": "Public_AR_Current",
-            "vintage":   "Current_Current",
-            "layers":    "Census Tracts",
-            "format":    "json"
-        }, timeout=10)
-        tracts = resp.json()["result"]["geographies"].get("Census Tracts", [])
-        if not tracts:
-            return None
-        t = tracts[0]
-        return t["STATE"] + t["COUNTY"] + t["TRACT"]
-    except Exception:
-        return None
+    for attempt in range(2):
+        try:
+            resp = requests.get(CENSUS_GEOCODER_URL, params={
+                "x": lon, "y": lat,
+                "benchmark": "Public_AR_Current",
+                "vintage":   "Current_Current",
+                "layers":    "Census Tracts",
+                "format":    "json"
+            }, timeout=15)
+            tracts = resp.json()["result"]["geographies"].get("Census Tracts", [])
+            if not tracts:
+                return None
+            t = tracts[0]
+            return t["STATE"] + t["COUNTY"] + t["TRACT"]
+        except Exception:
+            if attempt == 0:
+                time.sleep(2)
+            continue
+    return None
+
+
+def geocode_worker(item):
+    """Thread worker: geocode a single resource."""
+    resource_id, lat, lon = item
+    tract_id = geocode_tract_id(lat, lon)
+    return (resource_id, tract_id)
+
+
+def flush_updates(cur, conn, updates):
+    """Write a batch of (tract_id, resource_id) updates to the DB."""
+    if not updates:
+        return
+    psycopg2.extras.execute_batch(
+        cur,
+        'UPDATE "Resource" SET "tractId" = %s WHERE id = %s',
+        updates,
+        page_size=100
+    )
+    conn.commit()
 
 
 def main():
@@ -71,11 +102,7 @@ def main():
 
     needs_geocoding = cur.fetchall()
 
-    # Also count how many already have tractId
-    cur.execute("""
-        SELECT COUNT(*) FROM "Resource"
-        WHERE "tractId" IS NOT NULL
-    """)
+    cur.execute('SELECT COUNT(*) FROM "Resource" WHERE "tractId" IS NOT NULL')
     already_done = cur.fetchone()[0]
 
     print(f"  {already_done} resources already have tractId")
@@ -87,32 +114,39 @@ def main():
         conn.close()
         return
 
-    # Geocode and collect updates
-    updates = []
-    failed  = 0
+    # Chunked parallel geocoding to avoid API throttling
+    print(f"\nGeocoding with {MAX_WORKERS} threads, chunks of {CHUNK_SIZE}...")
 
-    for resource_id, lat, lon in tqdm(needs_geocoding, desc="  Geocoding"):
-        tract_id = geocode_tract_id(lat, lon)
-        if tract_id:
-            updates.append((tract_id, resource_id))
-        else:
-            failed += 1
+    total_succeeded = 0
+    total_failed    = 0
+    pbar = tqdm(total=len(needs_geocoding), desc="  Geocoding")
 
-    print(f"\n  Geocoded: {len(updates)} succeeded, {failed} failed")
+    for chunk_start in range(0, len(needs_geocoding), CHUNK_SIZE):
+        chunk = needs_geocoding[chunk_start: chunk_start + CHUNK_SIZE]
+        chunk_updates = []
 
-    # Batch update Supabase
-    if updates:
-        print(f"  Writing {len(updates)} tractIds to Resource table...")
-        psycopg2.extras.execute_batch(
-            cur,
-            'UPDATE "Resource" SET "tractId" = %s WHERE id = %s',
-            updates,
-            page_size=100
-        )
-        conn.commit()
-        print(f"  ✓ Done — {len(updates)} resources updated in Supabase")
-    else:
-        print("  No successful geocodes to write.")
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = {executor.submit(geocode_worker, item): item for item in chunk}
+
+            for future in as_completed(futures):
+                resource_id, tract_id = future.result()
+
+                if tract_id:
+                    chunk_updates.append((tract_id, resource_id))
+                    total_succeeded += 1
+                else:
+                    total_failed += 1
+
+                pbar.update(1)
+
+        # Flush this chunk's results to DB
+        flush_updates(cur, conn, chunk_updates)
+
+        # Brief pause between chunks to avoid rate limiting
+        if chunk_start + CHUNK_SIZE < len(needs_geocoding):
+            time.sleep(PAUSE_BETWEEN)
+
+    pbar.close()
 
     cur.close()
     conn.close()
@@ -120,11 +154,12 @@ def main():
     # Summary
     print(f"\n── Summary ─────────────────────────────────────────────")
     print(f"  Already had tractId:  {already_done}")
-    print(f"  Newly geocoded:       {len(updates)}")
-    print(f"  Failed:               {failed}")
-    print(f"  Total with tractId:   {already_done + len(updates)}")
+    print(f"  Newly geocoded:       {total_succeeded}")
+    print(f"  Failed:               {total_failed}")
+    print(f"  Total with tractId:   {already_done + total_succeeded}")
     print(f"─────────────────────────────────────────────────────────")
 
 
 if __name__ == "__main__":
     main()
+
