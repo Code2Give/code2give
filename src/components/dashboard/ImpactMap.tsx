@@ -67,12 +67,12 @@ export default function ImpactMap({
   }, [initialPantries]);
 
   return (
-    <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col h-[500px]">
+    <div className="rounded-xl border border-border overflow-hidden shadow-sm flex flex-col h-[500px]">
       {/* Map Control Header */}
-      <div className="bg-white p-4 border-b border-slate-100 flex items-center justify-between z-10 relative">
+      <div className="bg-card p-4 border-b border-slate-100 flex items-center justify-between z-10 relative">
         <div>
           <h3 className="font-semibold text-slate-900">{title}</h3>
-          <p className="text-sm text-slate-500">{subtitle}</p>
+          <p className="text-sm text-primary-foreground0">{subtitle}</p>
         </div>
 
         <div className="flex bg-slate-100 p-1 rounded-lg">
@@ -108,7 +108,7 @@ export default function ImpactMap({
               <Marker key={pantry.id} position={[pantry.latitude, pantry.longitude]}>
                 <Popup>
                   <strong className="block mb-1 font-semibold">{pantry.name}</strong>
-                  <p className="text-xs text-slate-600 mb-1">{pantry.description}</p>
+                  <p className="text-xs text-muted-foreground mb-1">{pantry.description}</p>
                   <span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-800">{pantry.hours}</span>
                 </Popup>
               </Marker>
