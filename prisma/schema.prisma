@@ -1,20 +1,13 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
-// Local development workflow:
-//   - Generate client: `npx prisma generate`
-//   - Create & apply a new migration to your *local/dev* DB: `npx prisma migrate dev --name <message>`
-// For Supabase / remote (e.g. prod) environments, apply existing migrations with: `npx prisma migrate deploy`
-// To update this schema from an existing Supabase database, use: `npx prisma db pull`
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
 
 datasource db {
   provider = "postgresql"
-}
-
-generator client {
-  provider = "prisma-client-js"
 }
 
 enum Role {
@@ -81,14 +74,26 @@ model GNNFeature {
 }
 
 model Feedback {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   text       String
   sentiment  String?
   tags       String[]
   resourceId String?
   resource   Resource? @relation(fields: [resourceId], references: [id])
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Pantry {
+  id          String   @id @default(cuid())
+  name        String
+  location    String?
+  latitude    Float
+  longitude   Float
+  hours       String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model CensusData {
