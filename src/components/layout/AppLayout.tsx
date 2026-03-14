@@ -83,7 +83,7 @@ function TopNav({ role, setRole }: { role: UserRole; setRole: (r: UserRole) => v
   const today = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 fixed top-0 left-64 right-0 z-10">
+    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 fixed top-0 left-64 right-0 z-50">
       <div className="flex items-center gap-4">
         <h1 className="text-gray-900">Dashboard</h1>
         <div className="h-6 w-px bg-gray-300" />
