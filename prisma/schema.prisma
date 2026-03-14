@@ -72,6 +72,12 @@ model Resource {
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
   feedback                 Feedback[]
+  gnnFeature               GNNFeature?
+}
+
+model GNNFeature {
+  resourceId String   @id
+  resource   Resource @relation(fields: [resourceId], references: [id])
 }
 
 model Feedback {
