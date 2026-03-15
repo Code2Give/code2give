@@ -15,6 +15,7 @@ function PageContent() {
   // Handle the "Client" persona specifically
   if (role === "client") {
     if (page === "map") return <FoodResourceMapPage />;
+    if (page === "community") return <CommunityHubPage />;
     return <ClientPage />;
   }
 
