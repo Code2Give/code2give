@@ -25,7 +25,7 @@ export default function ImpactMap() {
     fetch('/api/map-data?north=40.92&south=40.49&east=-73.70&west=-74.26')
       .then(res => res.json())
       .then(data => {
-        if (data.pantries) setPantries(data.pantries.slice(0, 40));
+        if (data.pantries) setPantries(data.pantries);
       })
       .catch(err => console.error("Map Data Error:", err));
   }, []);
