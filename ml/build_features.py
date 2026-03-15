@@ -4,7 +4,25 @@ Lemon-Aid — Phase 3: Feature Extraction & Graph Construction
 
 Queries the PostgreSQL database for all published food resources nationwide,
 computes node features (magnet score, barrier score, days covered, poverty index, etc.),
-constructs a spatial radius graph with BallTree, and writes nodes.csv + edges.csv.
+constructs a spatial radius graph with BallTree, computes a **coverage gap score**
+for each node, and writes nodes.csv + edges.csv.
+
+Coverage Gap Detection
+----------------------
+For each pantry we compute:
+
+    gap_score = poverty_index / (1 + neighbor_count_within_2km)
+
+High score = high need neighborhood, few nearby options.  We bucket into
+three tiers for the GNN label:
+
+    0 = well-covered  (bottom 50% of gap scores)
+    1 = moderate gap   (50th–85th percentile)
+    2 = critical gap   (top 15%)
+
+This is a genuine graph problem — "how covered is this area" is inherently
+about a node's relationship to its neighbors, which is exactly what message
+passing captures.
 
 Run:
     pip install -r requirements.txt
@@ -132,28 +150,6 @@ def compute_days_covered(shifts_json) -> float:
         return 0.0
 
 
-def compute_wait_bucket(wait_time) -> float:
-    """
-    Map raw wait time (minutes) to demand class.
-
-    Rules:
-      - Null              → NaN  (unlabeled — kept in graph, excluded from loss)
-      - Negative          → NaN  (data error: -1, -1.5 etc.)
-      - > 240             → NaN  (outlier / data error)
-      - 0 ≤ w ≤ 15       → 0    (low demand — 0 min is a valid real value)
-      - 15 < w ≤ 45      → 1    (moderate demand)
-      - 45 < w ≤ 240     → 2    (high demand)
-    """
-    if pd.isna(wait_time) or wait_time < 0 or wait_time > 240:
-        return float("nan")
-    if wait_time <= 15:
-        return 0
-    elif wait_time <= 45:
-        return 1
-    else:
-        return 2
-
-
 # ── Census geocode fallback ───────────────────────────────────────────────────
 
 def load_tract_cache() -> dict:
@@ -208,7 +204,7 @@ def main():
     conn = psycopg2.connect(DB_URL)
     cur = conn.cursor()
 
-    # ── 1. Query all published resources (no wait-time filter here) ───────────
+    # ── 1. Query all published resources ──────────────────────────────────────
     print("Fetching published food resources from database...")
     cur.execute("""
         SELECT
@@ -217,7 +213,6 @@ def main():
             r.longitude,
             r."resourceTypeId",
             r."ratingAverage",
-            r."waitTimeMinutesAverage",
             r.tags,
             r.shifts,
             r."subscriberCount",
@@ -237,7 +232,7 @@ def main():
     rows = cur.fetchall()
     colnames = [
         "resource_id", "latitude", "longitude",
-        "resourceTypeId", "ratingAverage", "waitTimeMinutesAverage",
+        "resourceTypeId", "ratingAverage",
         "tags", "shifts", "subscriberCount", "reviewCount",
         "tractId", "povertyIndex", "confidence", "appointmentRequired",
     ]
@@ -291,15 +286,6 @@ def main():
         rating_mean = 0.598  # fallback if somehow all null
     df["rating_normalized"] = df["rating_normalized"].fillna(rating_mean)
 
-    # --- wait_time_normalized ---
-    # Cap at 240, normalize. Negatives and >240 get imputed to 0.5 (neutral prior).
-    # The raw negative values (-1, -1.5) are data errors — treat same as missing.
-    df["waitTimeMinutesAverage"] = pd.to_numeric(df["waitTimeMinutesAverage"], errors="coerce")
-    valid_wait = df["waitTimeMinutesAverage"].where(
-        (df["waitTimeMinutesAverage"] >= 0) & (df["waitTimeMinutesAverage"] <= 240)
-    )
-    df["wait_time_normalized"] = (valid_wait / 240.0).fillna(0.5)
-
     # --- magnet_score ---
     df["magnet_score"] = df["tags"].apply(compute_magnet_score)
 
@@ -338,11 +324,6 @@ def main():
     # --- appointment_required (bool → 0/1 int, no nulls in DB) ---
     df["appointment_required"] = df["appointmentRequired"].astype(int)
 
-    # --- wait_bucket and has_label ---
-    # wait=0 is valid class 0. Only negatives and >240 become NaN (unlabeled).
-    df["wait_bucket"] = df["waitTimeMinutesAverage"].apply(compute_wait_bucket)
-    df["has_label"] = df["wait_bucket"].notna()
-
     # ── 4. Assign node indices ────────────────────────────────────────────────
     df = df.reset_index(drop=True)
     df["node_idx"] = df.index
@@ -365,8 +346,15 @@ def main():
     edge_targets: list = []
     edge_weights: list = []
 
+    # Also count neighbors per node for gap_score computation
+    neighbor_counts = np.zeros(len(df), dtype=int)
+
     for i in range(len(df)):
-        for j_pos, neighbor in enumerate(indices_list[i]):
+        neighbors_i = indices_list[i]
+        # Count excludes self
+        neighbor_counts[i] = len(neighbors_i) - 1  # -1 for self
+
+        for j_pos, neighbor in enumerate(neighbors_i):
             if neighbor == i:
                 continue  # skip self-loops
 
@@ -387,14 +375,55 @@ def main():
     # both added naturally since we iterate all nodes. Deduplicate to be safe.
     edges_df = edges_df.drop_duplicates(subset=["source", "target"])
 
-    # ── 6. Save CSVs ──────────────────────────────────────────────────────────
+    # ── 6. Compute coverage gap score and bucket ──────────────────────────────
+    print("\nComputing coverage gap scores...")
+
+    # Store neighbor count as both a feature and a component of the label
+    df["neighbor_count"] = neighbor_counts
+
+    # Normalize neighbor_count for use as a feature (log1p scale)
+    max_neighbors = df["neighbor_count"].max()
+    df["neighbor_count_normalized"] = (
+        np.log1p(df["neighbor_count"]) / np.log1p(max_neighbors)
+        if max_neighbors > 0 else 0.0
+    )
+
+    # Gap score: high poverty + few neighbors = critical gap
+    #   gap_score = poverty_index / (1 + neighbor_count_within_2km)
+    df["gap_score"] = df["poverty_index"] / (1 + df["neighbor_count"])
+
+    # Bucket into three tiers by percentile:
+    #   0 = well-covered  (bottom 50%)
+    #   1 = moderate gap   (50th–85th percentile)
+    #   2 = critical gap   (top 15%)
+    p50 = df["gap_score"].quantile(0.50)
+    p85 = df["gap_score"].quantile(0.85)
+
+    def assign_gap_bucket(score):
+        if score <= p50:
+            return 0
+        elif score <= p85:
+            return 1
+        else:
+            return 2
+
+    df["gap_bucket"] = df["gap_score"].apply(assign_gap_bucket)
+
+    print(f"  Gap score thresholds: p50={p50:.6f}, p85={p85:.6f}")
+    print(f"  Class distribution:")
+    for cls in [0, 1, 2]:
+        count = (df["gap_bucket"] == cls).sum()
+        pct = 100 * count / len(df)
+        label = {0: "well-covered", 1: "moderate gap", 2: "critical gap"}[cls]
+        print(f"    Class {cls} ({label}): {count} ({pct:.1f}%)")
+
+    # ── 7. Save CSVs ──────────────────────────────────────────────────────────
     print("\nSaving output files...")
 
     node_cols = [
         "node_idx", "resource_id", "latitude", "longitude",
         "resource_type",
         "rating_normalized",
-        "wait_time_normalized",
         "magnet_score",
         "barrier_score",
         "days_covered",
@@ -403,8 +432,9 @@ def main():
         "review_normalized",
         "confidence",
         "appointment_required",
-        "wait_bucket",
-        "has_label",
+        "neighbor_count_normalized",
+        "gap_score",
+        "gap_bucket",
     ]
     nodes_out = df[node_cols].copy()
     nodes_path = ML_DIR / "nodes.csv"
@@ -415,41 +445,36 @@ def main():
     edges_df.to_csv(edges_path, index=False)
     print(f"  Saved {edges_path} ({len(edges_df)} edges)")
 
-    # ── 7. Summary ────────────────────────────────────────────────────────────
-    labeled   = df[df["has_label"]]
-    unlabeled = df[~df["has_label"]]
-
+    # ── 8. Summary ────────────────────────────────────────────────────────────
     print(f"\n{'─' * 60}")
     print(f"  Total nodes:           {len(df)}")
     print(f"  Total edges:           {len(edges_df)}")
-    print(f"  Labeled nodes:         {len(labeled)}")
-    print(f"  Unlabeled nodes:       {len(unlabeled)}")
+    print(f"  ALL nodes are labeled  (gap_bucket is computable for every node)")
 
-    if len(labeled) > 0:
-        class_dist = labeled["wait_bucket"].value_counts().sort_index()
-        total_labeled = len(labeled)
-        print(f"\n  Class distribution (labeled nodes only):")
-        for cls, count in class_dist.items():
-            pct = 100 * count / total_labeled
-            label_name = {0: "0–15 min (low)", 1: "15–45 min (moderate)", 2: "45+ min (high)"}
-            print(f"    Class {int(cls)} {label_name.get(int(cls), '?')}: {count} ({pct:.1f}%)")
-        print(f"\n  Class weights for CrossEntropyLoss (total / (3 × class_count)):")
-        for cls, count in class_dist.items():
-            weight = total_labeled / (3 * count)
-            print(f"    Class {int(cls)}: {weight:.3f}")
+    class_dist = df["gap_bucket"].value_counts().sort_index()
+    total = len(df)
+    print(f"\n  Class distribution:")
+    for cls, count in class_dist.items():
+        pct = 100 * count / total
+        label_name = {0: "well-covered", 1: "moderate gap", 2: "critical gap"}
+        print(f"    Class {int(cls)} ({label_name.get(int(cls), '?')}): {count} ({pct:.1f}%)")
+    print(f"\n  Class weights for CrossEntropyLoss (total / (3 × class_count)):")
+    for cls, count in class_dist.items():
+        weight = total / (3 * count)
+        print(f"    Class {int(cls)}: {weight:.3f}")
 
     print(f"\n  Feature coverage (% of nodes with non-imputed values):")
     coverage_checks = {
-        "rating_normalized":      ("ratingAverage",            None),
-        "wait_time_normalized":   ("waitTimeMinutesAverage",   None),
-        "magnet_score":           (None,                       "magnet_score > 0"),
-        "barrier_score":          (None,                       "barrier_score > 0"),
-        "days_covered":           (None,                       "days_covered > 0"),
-        "poverty_index":          ("povertyIndex",             None),
-        "subscriber_normalized":  ("subscriberCount",          None),
-        "review_normalized":      ("reviewCount",              None),
-        "confidence":             ("confidence",               None),
-        "appointment_required":   (None,                       "appointment_required == 1"),
+        "rating_normalized":          ("ratingAverage",            None),
+        "magnet_score":               (None,                       "magnet_score > 0"),
+        "barrier_score":              (None,                       "barrier_score > 0"),
+        "days_covered":               (None,                       "days_covered > 0"),
+        "poverty_index":              ("povertyIndex",             None),
+        "subscriber_normalized":      ("subscriberCount",          None),
+        "review_normalized":          ("reviewCount",              None),
+        "confidence":                 ("confidence",               None),
+        "appointment_required":       (None,                       "appointment_required == 1"),
+        "neighbor_count_normalized":  (None,                       "neighbor_count > 0"),
     }
     for feat, (raw_col, expr) in coverage_checks.items():
         if raw_col is not None:
@@ -467,8 +492,14 @@ def main():
         print(f"  Max edges/node:        {edges_per_node.max()}")
         print(f"  Isolated nodes (0 edges): {isolated}")
 
+    print(f"\n  Gap score stats:")
+    print(f"    Min:    {df['gap_score'].min():.6f}")
+    print(f"    Mean:   {df['gap_score'].mean():.6f}")
+    print(f"    Median: {df['gap_score'].median():.6f}")
+    print(f"    Max:    {df['gap_score'].max():.6f}")
+
     print(f"{'─' * 60}")
-    print("\nDone! Run train_gnn.py next.")
+    print("\nDone! Run train_GNN.py next.")
 
 
 if __name__ == "__main__":

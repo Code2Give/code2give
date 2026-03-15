@@ -50,6 +50,7 @@ model Resource {
   priority               Int?
   mergedToResourceId     String?
   tractId                String?
+  gnnScore               Float?
   contacts               Json        @default("[]")
   images                 Json        @default("[]")
   shifts                 Json        @default("[]")

@@ -1,9 +1,17 @@
 """
-trainGNN.py
-Lemon-Aid - Phase 3: GraphSAGE Training
+train_GNN.py
+Lemon-Aid - Phase 3: GraphSAGE Training — Coverage Gap Detection
 
 Trains a 2-layer GraphSAGE model for 3-class node classification
-(wait_bucket: 0 = 0-15 min, 1 = 15-45 min, 2 = 45+ min).
+(gap_bucket: 0 = well-covered, 1 = moderate gap, 2 = critical gap).
+
+The label measures how underserved a food resource's neighborhood is:
+    gap_score = poverty_index / (1 + neighbor_count_within_2km)
+Bucketed by percentile: bottom 50% = 0, 50-85% = 1, top 15% = 2.
+
+This is a genuine graph problem — "how covered is this area" is inherently
+about a node's relationship to its neighbors, which is exactly what
+GraphSAGE's message passing captures.
 
 Reads:  ml/nodes.csv, ml/edges.csv
 Writes: ml/lemontree_gnn_v1.pth, ml/predictions.csv, ml/output/training_log.o
@@ -11,7 +19,7 @@ Writes: ml/lemontree_gnn_v1.pth, ml/predictions.csv, ml/output/training_log.o
 Run:
     pip install -r requirements.txt
     cd ml
-    python trainGNN.py
+    python train_GNN.py
 
 CUDA is used automatically if available.
 
@@ -36,7 +44,7 @@ CUDA is used automatically if available.
            v
   +-----------------------------+
   |   Linear(32 -> 3)           |  Classifier head: maps embedding to
-  +-----------------------------+  3 class logits (low/moderate/high)
+  +-----------------------------+  3 class logits (well-covered / moderate / critical)
            |
            v
       CrossEntropyLoss
@@ -59,9 +67,9 @@ After Layer 1: each node's 64-dim vector encodes its own features
 After Layer 2: each node's 32-dim vector now encodes its own features
   PLUS neighbors PLUS neighbors-of-neighbors (2-hop).
 
-This is the demand spillover signal: a food pantry surrounded by
-overwhelmed neighbors will have that pressure reflected in its
-embedding, even if its own historical wait time was low.
+This captures the coverage gap signal: a food pantry in a high-poverty
+area with few neighbors will have that isolation reflected in its
+embedding, as will pantries whose neighbors are ALSO isolated.
 
 WHY GRAPHSAGE SPECIFICALLY
 --------------------------
@@ -73,15 +81,11 @@ rather than a fixed embedding per node. This means:
 
 TRAINING SETUP
 --------------
-  - Only labeled nodes (has_label=True, ~4416 nodes) contribute to loss
-  - Unlabeled nodes (~4094) still receive messages from neighbors and
-    pass their own messages - they participate fully in aggregation
-  - Stratified 80/20 split ensures class 2 (183 samples) appears in
-    both train and val despite being rare
-  - Class weights in CrossEntropyLoss force the model to care about
-    getting the rare high-demand class right (weight ~8x vs class 0)
-  - Best model saved by val F1 macro (not accuracy - accuracy is
-    misleading when 65% of labels are class 0)
+  - All nodes are labeled (gap_bucket is computable for every node)
+  - Stratified 80/20 split ensures the rarer critical gap class
+    appears in both train and val
+  - Class weights in CrossEntropyLoss upweight the critical gap class
+  - Best model saved by val F1 macro (not accuracy)
 # =========================================================
 """
 
@@ -104,21 +108,25 @@ ML_DIR = Path(".")
 # All 11 node features - must match the column order in nodes.csv.
 # build_features.py produces these columns; any change there must be
 # reflected here.
+#
+# NOTE: wait_time_normalized was REMOVED — it directly encoded the old
+# label (wait_bucket), causing data leakage (0.99 F1). The remaining 10
+# original features are supplemented by neighbor_count_normalized.
 FEATURE_COLS = [
-    "resource_type",           # 0=Food Pantry, 1=Soup Kitchen, 2=Community Fridge
-    "rating_normalized",       # ratingAverage / 3.0, null -> dataset mean
-    "wait_time_normalized",    # waitTimeMinutesAverage / 240, null/neg -> 0.5
-    "magnet_score",            # fraction of high-draw OFFERING tags present
-    "barrier_score",           # fraction of access-restriction REQUIREMENT tags
-    "days_covered",            # unique scheduled weekdays / 7
-    "poverty_index",           # ACS5 census tract poverty rate (0-1)
-    "subscriber_normalized",   # log1p(subscribers) / log1p(max)
-    "review_normalized",       # log1p(reviews) / log1p(max)
-    "confidence",              # Lemontree data quality score (0-1, no nulls)
-    "appointment_required",    # 1 if appointment required, else 0
+    "resource_type",               # 0=Food Pantry, 1=Soup Kitchen, 2=Community Fridge
+    "rating_normalized",           # ratingAverage / 3.0, null -> dataset mean
+    "magnet_score",                # fraction of high-draw OFFERING tags present
+    "barrier_score",               # fraction of access-restriction REQUIREMENT tags
+    "days_covered",                # unique scheduled weekdays / 7
+    "poverty_index",               # ACS5 census tract poverty rate (0-1)
+    "subscriber_normalized",       # log1p(subscribers) / log1p(max)
+    "review_normalized",           # log1p(reviews) / log1p(max)
+    "confidence",                  # Lemontree data quality score (0-1, no nulls)
+    "appointment_required",        # 1 if appointment required, else 0
+    # "neighbor_count_normalized",   # log1p(neighbor_count) / log1p(max) — spatial density
 ]
 
-# in_channels is derived automatically - no need to update when adding features
+# in_channels is derived automatically
 IN_CHANNELS   = len(FEATURE_COLS)   # 11
 HIDDEN_DIM    = 64
 EMBED_DIM     = 32
@@ -133,6 +141,8 @@ OUTPUT_DIR       = ML_DIR / "output"
 MODEL_PATH       = ML_DIR / "lemontree_gnn_v1.pth"
 PREDICTIONS_PATH = ML_DIR / "predictions.csv"
 TRAINING_LOG     = OUTPUT_DIR / "training_log.o"
+
+CLASS_NAMES = ["0: Well-Covered", "1: Moderate Gap", "2: Critical Gap"]
 
 
 # -- Model ---------------------------------------------------------------------
@@ -151,7 +161,7 @@ class GraphSAGEWithEmbeddings(torch.nn.Module):
 
     The embeddings are the 32-dim vectors saved to predictions.csv.
     They can be used downstream for clustering, similarity search, or
-    visualisation (e.g. UMAP/t-SNE of pantry demand profiles).
+    visualisation (e.g. UMAP/t-SNE of coverage gap profiles).
     """
 
     def __init__(
@@ -209,6 +219,13 @@ def load_data() -> tuple[Data, pd.DataFrame]:
             f"Re-run build_features.py to regenerate nodes.csv."
         )
 
+    # Validate label column is present
+    if "gap_bucket" not in nodes_df.columns:
+        raise ValueError(
+            "Missing 'gap_bucket' column in nodes.csv.\n"
+            "Re-run build_features.py to regenerate nodes.csv."
+        )
+
     # Feature matrix: N x 11
     x = torch.tensor(nodes_df[FEATURE_COLS].values, dtype=torch.float)
 
@@ -218,18 +235,14 @@ def load_data() -> tuple[Data, pd.DataFrame]:
         dtype=torch.long,
     )
 
-    # Labels: -1 for unlabeled nodes (excluded from loss by mask)
-    has_label = nodes_df["has_label"].values.astype(bool)
-    raw_labels = nodes_df["wait_bucket"].values
-
-    y = torch.full((len(nodes_df),), -1, dtype=torch.long)
-    for i in range(len(nodes_df)):
-        if has_label[i] and not np.isnan(raw_labels[i]):
-            y[i] = int(raw_labels[i])
+    # Labels: all nodes have a gap_bucket (0, 1, or 2)
+    y = torch.tensor(nodes_df["gap_bucket"].values.astype(int), dtype=torch.long)
 
     data = Data(x=x, edge_index=edge_index, y=y)
-    data.labeled_mask = torch.tensor(has_label, dtype=torch.bool)
     data.resource_ids = nodes_df["resource_id"].values
+
+    # Store gap_score for output
+    data.gap_scores = nodes_df["gap_score"].values
 
     return data, nodes_df
 
@@ -238,17 +251,17 @@ def load_data() -> tuple[Data, pd.DataFrame]:
 
 def stratified_split(data: Data) -> tuple[torch.Tensor, torch.Tensor]:
     """
-    Stratified 80/20 train/val split on labeled nodes only.
-    Stratification ensures the rare class 2 (183 samples) appears in
-    both splits rather than being accidentally concentrated in one.
+    Stratified 80/20 train/val split on all nodes.
+    Stratification ensures the critical gap class appears proportionally
+    in both splits.
     """
-    labeled_indices = data.labeled_mask.nonzero(as_tuple=True)[0].numpy()
-    labeled_labels  = data.y[data.labeled_mask].numpy()
+    all_indices = np.arange(data.num_nodes)
+    all_labels  = data.y.numpy()
 
     train_idx, val_idx = train_test_split(
-        labeled_indices,
+        all_indices,
         test_size=1 - TRAIN_RATIO,
-        stratify=labeled_labels,
+        stratify=all_labels,
         random_state=42,
     )
 
@@ -264,10 +277,10 @@ def compute_class_weights(data: Data, train_mask: torch.Tensor) -> torch.Tensor:
     """
     Inverse frequency weights: total / (num_classes x count_per_class).
 
-    With distribution ~65% / 31% / 4%, this produces roughly:
-        Class 0 (low):      ~0.51  - underweighted relative to uniform
-        Class 1 (moderate): ~1.08  - near uniform
-        Class 2 (high):     ~8.0   - heavily upweighted
+    With distribution ~50% / 35% / 15%, this produces roughly:
+        Class 0 (well-covered):  ~0.67
+        Class 1 (moderate gap):  ~0.95
+        Class 2 (critical gap):  ~2.22
 
     This prevents the model from collapsing to always predict class 0.
     """
@@ -344,18 +357,16 @@ def main():
     data.train_mask = train_mask
     data.val_mask   = val_mask
 
-    n_labeled   = data.labeled_mask.sum().item()
-    n_unlabeled = data.num_nodes - n_labeled
     print(f"\n  Total nodes:   {data.num_nodes}")
-    print(f"  Labeled:       {n_labeled}  (train: {train_mask.sum().item()}, val: {val_mask.sum().item()})")
-    print(f"  Unlabeled:     {n_unlabeled}  (participate in message passing, excluded from loss)")
+    print(f"  Train:         {train_mask.sum().item()}")
+    print(f"  Validation:    {val_mask.sum().item()}")
+    print(f"  All nodes are labeled (gap_bucket is computable for every node)")
 
     # -- Class weights ---------------------------------------------------------
     class_weights = compute_class_weights(data, train_mask)
     print(f"\n  Class weights: {[round(w, 3) for w in class_weights.tolist()]}")
-    print(f"    Class 0 (0-15 min):   {class_weights[0]:.3f}")
-    print(f"    Class 1 (15-45 min):  {class_weights[1]:.3f}")
-    print(f"    Class 2 (45+ min):    {class_weights[2]:.3f}  * upweighted due to rarity")
+    for i, name in enumerate(CLASS_NAMES):
+        print(f"    {name}: {class_weights[i]:.3f}")
 
     # -- Move to device --------------------------------------------------------
     data          = data.to(device)
@@ -382,7 +393,7 @@ def main():
 
     # -- Training loop ---------------------------------------------------------
     print(f"\nTraining for {EPOCHS} epochs (saving best by val F1 macro)...")
-    header = f"{'Epoch':>6} {'Train Loss':>11} {'Val Loss':>10} {'Val Acc':>9} {'Val F1':>8}  F1 per class [0, 1, 2]"
+    header = f"{'Epoch':>6} {'Train Loss':>11} {'Val Loss':>10} {'Val Acc':>9} {'Val F1':>8}  F1 per class [well-covered, moderate, critical]"
 
     # Create output directory and open log file
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -402,8 +413,6 @@ def main():
         pbar.set_postfix(train_loss=f"{train_loss:.4f}")
 
         # Save best checkpoint by val F1 macro - not accuracy.
-        # Accuracy is misleading with 65% class 0: a model that predicts
-        # everything as class 0 would get 65% accuracy but F1 macro of ~0.26.
         if val_f1 > best_f1:
             best_f1    = val_f1
             best_epoch = epoch
@@ -419,6 +428,7 @@ def main():
                     "embed_dim":        EMBED_DIM,
                     "num_classes":      NUM_CLASSES,
                     "class_weights":    class_weights.cpu().tolist(),
+                    "class_names":      CLASS_NAMES,
                 },
                 MODEL_PATH,
             )
@@ -456,7 +466,7 @@ def main():
     model.eval()
 
     # -- Inference on ALL nodes ------------------------------------------------
-    print("Running inference on all 8,510 nodes...")
+    print(f"Running inference on all {data.num_nodes:,} nodes...")
     with torch.no_grad():
         logits, embeddings = model(data.x, data.edge_index)
         probs      = F.softmax(logits, dim=1)
@@ -469,7 +479,10 @@ def main():
         "resource_id":      data.resource_ids,
         "predicted_bucket": predicted,
         "confidence":       np.round(confidence, 4),
-        # Per-class probabilities (useful for dashboard ranking)
+        "gap_score":        np.round(data.gap_scores, 6),
+        # Per-class probabilities
+        # prob_class2 = probability of critical gap — this is the GNN score
+        # written back to the Resource table as gnnScore
         "prob_class0":      np.round(probs.cpu().numpy()[:, 0], 4),
         "prob_class1":      np.round(probs.cpu().numpy()[:, 1], 4),
         "prob_class2":      np.round(probs.cpu().numpy()[:, 2], 4),
@@ -493,30 +506,39 @@ def main():
     print("=" * 60)
     print(classification_report(
         val_true, val_pred,
-        target_names=["0: 0-15 min", "1: 15-45 min", "2: 45+ min"],
+        target_names=CLASS_NAMES,
         zero_division=0,
     ))
 
-    # -- Bottleneck alert candidates -------------------------------------------
-    unlabeled_mask  = ~data.labeled_mask.cpu().numpy()
-    unlabeled_preds = predicted[unlabeled_mask]
-    n_bottleneck    = (unlabeled_preds == 2).sum()
-
+    # -- Coverage Gap Summary --------------------------------------------------
     print("=" * 60)
-    print("Bottleneck Alert Candidates (unlabeled nodes)")
+    print("Coverage Gap Analysis")
     print("=" * 60)
-    print(f"  Total unlabeled:                  {unlabeled_mask.sum()}")
-    print(f"  Predicted class 2 (45+ min):      {n_bottleneck}")
-    print(f"  -> These are pantries with no historical wait data that the")
-    print(f"    model predicts are under high demand based on their features")
-    print(f"    and neighborhood context. Surface these in the dashboard.")
-    print(f"\n  Full distribution (unlabeled nodes):")
-    labels_desc = {0: "low (0-15 min)", 1: "moderate (15-45 min)", 2: "HIGH (45+ min)"}
-    for cls in range(NUM_CLASSES):
-        count = (unlabeled_preds == cls).sum()
-        pct   = 100 * count / len(unlabeled_preds) if len(unlabeled_preds) > 0 else 0
-        print(f"    Class {cls} - {labels_desc[cls]}: {count} ({pct:.1f}%)")
 
+    for cls, name in enumerate(CLASS_NAMES):
+        count = (predicted == cls).sum()
+        pct = 100 * count / len(predicted)
+        print(f"  {name}: {count} ({pct:.1f}%)")
+
+    # Highlight critical gap nodes
+    critical_mask = predicted == 2
+    n_critical = critical_mask.sum()
+    print(f"\n  Critical gap nodes: {n_critical}")
+    print(f"  -> These are food resources in high-poverty neighborhoods with")
+    print(f"     few nearby alternatives. A single new pantry in these areas")
+    print(f"     would have the highest impact on food access.")
+
+    # Show top-10 highest GNN scores (prob_class2)
+    prob_c2 = probs.cpu().numpy()[:, 2]
+    top_indices = np.argsort(prob_c2)[::-1][:10]
+    print(f"\n  Top 10 highest-priority locations (by prob_class2 / GNN score):")
+    for rank, idx in enumerate(top_indices, 1):
+        rid = data.resource_ids[idx]
+        score = prob_c2[idx]
+        gap = data.gap_scores[idx]
+        print(f"    {rank:>2}. {rid}  gnn_score={score:.4f}  gap_score={gap:.6f}")
+
+    print(f"\n  Run write_scores.py to write gnnScore back to Supabase.")
     print(f"\n{'=' * 60}")
     print("Done!")
 
