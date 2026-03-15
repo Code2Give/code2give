@@ -55,7 +55,7 @@ export default function AnalyticsPage() {
       </header>
 
       {/* ── Reliability Dashboard ── */}
-      <section className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-8">
+      <section className="bg-white p-8 rounded-4xl border border-gray-100 shadow-sm space-y-8">
         <div className="flex items-center gap-3">
           <div className="bg-[#FFCC10] p-2 rounded-xl">
             <Star className="w-5 h-5 text-black" fill="currentColor" />
@@ -104,7 +104,7 @@ export default function AnalyticsPage() {
 
       {/* ── Borough & Mix Charts ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
+        <div className="bg-white p-8 rounded-4xl border border-gray-100 shadow-sm">
           <h3 className="text-xl font-bold mb-8 text-gray-900">Avg Rating by Borough</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -119,7 +119,7 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
+        <div className="bg-white p-8 rounded-4xl border border-gray-100 shadow-sm">
           <h3 className="text-xl font-bold mb-8 text-gray-900">Resource Type Mix</h3>
           <div className="h-64 flex flex-col items-center">
             <ResponsiveContainer width="100%" height="100%">
@@ -145,7 +145,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* ── Operational Analysis Table ── */}
-      <section className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+      <section className="bg-white rounded-4xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="p-8 border-b border-gray-50 flex justify-between items-end">
           <div>
             <h3 className="text-xl font-bold text-gray-900 uppercase tracking-tighter">Wait Time vs. Rating</h3>

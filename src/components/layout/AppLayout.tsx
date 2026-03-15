@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import {
   LayoutDashboard, MapPin, FileText, TrendingUp,
-  Apple, AlertTriangle, Settings, ChevronDown, User, Leaf, PanelLeftClose, PanelLeftOpen, Table2, Star, Camera, MessageSquare,
+  Apple, AlertTriangle, Settings, ChevronDown, User, Leaf, PanelLeftClose, PanelLeftOpen, Table2, Star, Camera, MessageSquare, BarChart3,
 } from "lucide-react";
 
 // UPDATED: Added 'client' to UserRole
@@ -49,7 +49,6 @@ function Sidebar({ page, setPage, collapsed, setCollapsed, role }: {
   setCollapsed: (v: boolean) => void;
   role: UserRole;
 }) {
-  const items = role === "client" ? clientNavItems : navItems;
 
   return (
     <aside className={`${collapsed ? "w-16" : "w-64"} bg-card border-r border-gray-200 flex flex-col fixed left-0 top-16 bottom-0 z-20 transition-all duration-300`}>
