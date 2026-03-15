@@ -27,11 +27,11 @@ export function useApp() {
 
 // UPDATED: Added label for client
 const roleLabels: Record<UserRole, string> = {
+  client: "Community Member",
   internal: "Lemontree Team",
   government: "Government Agency",
   donor: "Donor",
   provider: "Food Pantry",
-  client: "Client",
 };
 
 const navItems: { id: PageId; label: string; icon: React.ElementType }[] = [
