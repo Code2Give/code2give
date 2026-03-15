@@ -975,7 +975,7 @@ export function FoodResourceMapPage() {
             </select>
 
             <select onChange={e => { if (e.target.value) { handleTagClick(e.target.value); e.currentTarget.value = ""; } }}
-              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer max-w-[160px]">
+              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer max-w-40">
               <option value="">{activeTag ? `✓ ${activeTag}` : "Food preferences…"}</option>
               {FOOD_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -1056,7 +1056,7 @@ export function FoodResourceMapPage() {
                   ? `${filteredResources.length} within ${radiusMiles} mi`
                   : `${filteredResources.length.toLocaleString()} resource${filteredResources.length !== 1 ? "s" : ""}`}
               </span>
-              <div className="flex items-center gap-1.5 bg-gray-100 rounded-lg px-2.5 py-1.5 flex-1 max-w-[160px]">
+              <div className="flex items-center gap-1.5 bg-gray-100 rounded-lg px-2.5 py-1.5 flex-1 max-w-40">
                 <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                 <input type="text" placeholder="Search…" value={searchInput}
                   onChange={e => setSearchInput(e.target.value)}
@@ -1157,7 +1157,7 @@ export function FoodResourceMapPage() {
                 icon={getMarkerIcon(p.badge, p.ratingAverage, selectedPantry?.id === p.id)}
                 onClick={() => handleMarkerClick(p)}>
                 {selectedPantry?.id === p.id && (
-                  <InfoWindow onCloseClick={() => { setSelectedPantry(null); setSelectionSource(null); }}>
+                  <InfoWindow position={{ lat: p.latitude, lng: p.longitude }} onCloseClick={() => { setSelectedPantry(null); setSelectionSource(null); }}>
                     <div className="w-52 text-sm">
                       <p className="font-semibold text-gray-900 mb-1">{p.name}</p>
                       <p className="text-xs text-gray-500 mb-1">{p.location}</p>
@@ -1184,7 +1184,7 @@ export function FoodResourceMapPage() {
 
             {zipInfoWindow && (
               <InfoWindow position={{ lat: zipInfoWindow.lat, lng: zipInfoWindow.lng }} onCloseClick={() => setZipInfoWindow(null)}>
-                <div className="text-xs text-gray-800 max-w-[200px] leading-relaxed">
+                <div className="text-xs text-gray-800 max-w-50 leading-relaxed">
                   <p className="font-semibold text-gray-900 mb-1">{zipInfoWindow.title}</p>
                   {zipInfoWindow.content}
                 </div>
@@ -1204,7 +1204,7 @@ export function FoodResourceMapPage() {
           )}
 
           {/* Floating Legend */}
-          <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-gray-200 p-3 min-w-[152px]">
+          <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-gray-200 p-3 min-w-38">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Marker Quality</p>
             {[
               { label: "Excellent", color: "#2E7D32", badge: "Excellent" },

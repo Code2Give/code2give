@@ -26,14 +26,12 @@ export async function GET(request: Request) {
     const east  = parseNumber(searchParams.get("east"));
     const west  = parseNumber(searchParams.get("west"));
 
-    if (north == null || south == null || east == null || west == null) {
-      return NextResponse.json(
-        { error: "Missing bounds", pantries: [], totalPantries: 0, censusStats: [] },
-        { status: 400 }
-      );
-    }
+    const bounds =
+      north != null && south != null && east != null && west != null
+        ? { north, south, east, west }
+        : { north: 40.92, south: 40.49, east: -73.70, west: -74.26 }; // default NYC bounds
 
-    const data = await getMapData("default", { north, south, east, west });
+    const data = await getMapData("default", bounds);
 
     return NextResponse.json({
       pantries:      data.pantries,
