@@ -625,11 +625,11 @@ function KPIs({ role, insights, totalPantries }: {
 }) {
   if (!insights) return <div className="col-span-4 h-24 bg-gray-50 rounded-lg animate-pulse" />;
   const { summary } = insights;
-  const gap = Math.round((summary.unavailable / summary.total) * 100);
+  const gap = Math.round(((summary.unavailable ?? 0) / summary.total) * 100);
 
   const governmentKPIs = [
     { title: "Total Resources Mapped", value: summary.total.toLocaleString(), icon: MapPin, subtitle: "NYC Metro area" },
-    { title: "Service Gaps", value: `${gap}%`, icon: TrendingDown, subtitle: `${summary.unavailable.toLocaleString()} unavailable` },
+    { title: "Service Gaps", value: `${gap}%`, icon: TrendingDown, subtitle: `${(summary.unavailable ?? 0).toLocaleString()} unavailable` },
     { title: "Avg Community Rating", value: summary.avgRating.toFixed(2), icon: BarChart3, subtitle: "Out of 5.0" },
     { title: "Engagement", value: summary.hasSubscribers.toLocaleString(), icon: Users, subtitle: "Active followers" },
   ];
