@@ -116,7 +116,7 @@ function getMarkerIcon(badge?: string, rating?: number | null, selected = false)
     fillColor: color, fillOpacity: 0.9,
     strokeColor: selected ? "#1e293b" : "#ffffff",
     strokeWeight: selected ? 3 : 2,
-    scale: selected ? 1.5 : 1,
+    scale: selected ? 0.9 : 0.6,
   };
 }
 
