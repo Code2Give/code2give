@@ -90,7 +90,7 @@ const MOCK_REPORTS: CommunityReport[] = [
 
 const BADGES = [
   {
-    id:"first", label:"First Snapshot", desc:"Upload 1 photo", threshold:1, color:"#F9A825",
+    id:"first", label:"First Snapshot", desc:"Share your 1st report", threshold:1, color:"#F9A825",
     Svg: ({ u }: { u: boolean }) => (
       <svg viewBox="0 0 100 100" width="100%" height="100%">
         <circle cx="50" cy="50" r="46" fill={u?"#FFF3B0":"#e8e8e8"} stroke={u?"#F4B400":"#b0b0b0"} strokeWidth="3"/>
@@ -105,7 +105,23 @@ const BADGES = [
     ),
   },
   {
-    id:"hand", label:"Helping Hand", desc:"Upload 5 photos", threshold:5, color:"#7CB342",
+    id:"produce", label:"Produce Power", desc:"Share 3 fresh finds", threshold:3, color:"#558B2F",
+    Svg: ({ u }: { u: boolean }) => (
+      <svg viewBox="0 0 100 100" width="100%" height="100%">
+        <circle cx="50" cy="50" r="46" fill={u?"#F1F8E9":"#e8e8e8"} stroke={u?"#558B2F":"#b0b0b0"} strokeWidth="3"/>
+        <circle cx="50" cy="50" r="40" fill="none" stroke={u?"#AED581":"#c8c8c8"} strokeWidth="2" strokeDasharray="4 3"/>
+        <path d="M50 36 Q60 42 58 60 Q54 70 50 72 Q46 70 42 60 Q40 42 50 36Z" fill={u?"#FF8F00":"#d0d0d0"} stroke={u?"#E65100":"#a0a0a0"} strokeWidth="1.5"/>
+        <path d="M44 48 Q50 46 56 48" fill="none" stroke={u?"#E65100":"#b8b8b8"} strokeWidth="1.2" strokeLinecap="round"/>
+        <path d="M43 55 Q50 53 57 55" fill="none" stroke={u?"#E65100":"#b8b8b8"} strokeWidth="1.2" strokeLinecap="round"/>
+        <path d="M50 36 Q44 24 38 26 Q44 32 48 37" fill={u?"#558B2F":"#b0b0b0"}/>
+        <path d="M50 36 Q50 22 50 24 Q50 30 50 36" fill={u?"#7CB342":"#b8b8b8"}/>
+        <path d="M50 36 Q56 24 62 26 Q56 32 52 37" fill={u?"#558B2F":"#b0b0b0"}/>
+        {u && <><text x="13" y="22" fontSize="9" fill="#8BC34A">✦</text><text x="75" y="20" fontSize="7" fill="#558B2F">✦</text></>}
+      </svg>
+    ),
+  },
+  {
+    id:"hand", label:"Helping Hand", desc:"Share 5 reports", threshold:5, color:"#7CB342",
     Svg: ({ u }: { u: boolean }) => (
       <svg viewBox="0 0 100 100" width="100%" height="100%">
         <circle cx="50" cy="50" r="46" fill={u?"#F1F8E9":"#e8e8e8"} stroke={u?"#7CB342":"#b0b0b0"} strokeWidth="3"/>
@@ -121,7 +137,27 @@ const BADGES = [
     ),
   },
   {
-    id:"contrib", label:"Contributor", desc:"Upload 10 photos", threshold:10, color:"#1976D2",
+    id:"shelf", label:"Shelf Spotter", desc:"Share 8 reports", threshold:8, color:"#F57C00",
+    Svg: ({ u }: { u: boolean }) => (
+      <svg viewBox="0 0 100 100" width="100%" height="100%">
+        <circle cx="50" cy="50" r="46" fill={u?"#FFF3E0":"#e8e8e8"} stroke={u?"#F57C00":"#b0b0b0"} strokeWidth="3"/>
+        <circle cx="50" cy="50" r="40" fill="none" stroke={u?"#FFCC80":"#c8c8c8"} strokeWidth="2" strokeDasharray="4 3"/>
+        <rect x="24" y="62" width="40" height="5" rx="2" fill={u?"#fff":"#d8d8d8"} stroke={u?"#F57C00":"#a0a0a0"} strokeWidth="1.8"/>
+        <rect x="24" y="50" width="40" height="5" rx="2" fill={u?"#fff":"#d8d8d8"} stroke={u?"#F57C00":"#a0a0a0"} strokeWidth="1.8"/>
+        <rect x="24" y="38" width="40" height="5" rx="2" fill={u?"#fff":"#d8d8d8"} stroke={u?"#F57C00":"#a0a0a0"} strokeWidth="1.8"/>
+        <rect x="27" y="57" width="5" height="5" rx="1" fill={u?"#EF5350":"#c0c0c0"}/>
+        <rect x="34" y="58" width="4" height="4" rx="1" fill={u?"#42A5F5":"#c0c0c0"}/>
+        <rect x="27" y="45" width="4" height="5" rx="1" fill={u?"#66BB6A":"#c0c0c0"}/>
+        <rect x="33" y="46" width="5" height="4" rx="1" fill={u?"#FFA726":"#c0c0c0"}/>
+        <circle cx="64" cy="44" r="11" fill="none" stroke={u?"#F57C00":"#a0a0a0"} strokeWidth="3.5"/>
+        <circle cx="64" cy="44" r="7" fill={u?"#FFF3E0":"#e8e8e8"} stroke="none"/>
+        <line x1="72" y1="52" x2="78" y2="58" stroke={u?"#F57C00":"#a0a0a0"} strokeWidth="4" strokeLinecap="round"/>
+        {u && <><text x="12" y="22" fontSize="9" fill="#FFB74D">✦</text><text x="75" y="20" fontSize="7" fill="#F57C00">✦</text></>}
+      </svg>
+    ),
+  },
+  {
+    id:"contrib", label:"Contributor", desc:"Share 10 reports", threshold:10, color:"#1976D2",
     Svg: ({ u }: { u: boolean }) => (
       <svg viewBox="0 0 100 100" width="100%" height="100%">
         <circle cx="50" cy="50" r="46" fill={u?"#E3F2FD":"#e8e8e8"} stroke={u?"#1976D2":"#b0b0b0"} strokeWidth="3"/>
@@ -137,7 +173,39 @@ const BADGES = [
     ),
   },
   {
-    id:"local", label:"Local Guide", desc:"Upload 15 photos", threshold:15, color:"#0288D1",
+    id:"voice", label:"Community Voice", desc:"Share 12 reports", threshold:12, color:"#00838F",
+    Svg: ({ u }: { u: boolean }) => (
+      <svg viewBox="0 0 100 100" width="100%" height="100%">
+        <circle cx="50" cy="50" r="46" fill={u?"#E0F7FA":"#e8e8e8"} stroke={u?"#00838F":"#b0b0b0"} strokeWidth="3"/>
+        <circle cx="50" cy="50" r="40" fill="none" stroke={u?"#80DEEA":"#c8c8c8"} strokeWidth="2" strokeDasharray="4 3"/>
+        <rect x="43" y="30" width="14" height="22" rx="7" fill={u?"#fff":"#d0d0d0"} stroke={u?"#00838F":"#a0a0a0"} strokeWidth="2.5"/>
+        <path d="M35 52 Q35 66 50 66 Q65 66 65 52" fill="none" stroke={u?"#00838F":"#a0a0a0"} strokeWidth="2.5" strokeLinecap="round"/>
+        <line x1="50" y1="66" x2="50" y2="74" stroke={u?"#00838F":"#a0a0a0"} strokeWidth="2.5" strokeLinecap="round"/>
+        <line x1="42" y1="74" x2="58" y2="74" stroke={u?"#00838F":"#a0a0a0"} strokeWidth="2.5" strokeLinecap="round"/>
+        {u && <>
+          <path d="M68 42 Q73 50 68 58" fill="none" stroke="#00838F" strokeWidth="2" strokeLinecap="round"/>
+          <path d="M73 37 Q80 50 73 63" fill="none" stroke="#B2EBF2" strokeWidth="1.5" strokeLinecap="round"/>
+          <text x="11" y="22" fontSize="9" fill="#26C6DA">✦</text><text x="75" y="20" fontSize="7" fill="#00838F">✦</text>
+        </>}
+      </svg>
+    ),
+  },
+  {
+    id:"fresh", label:"Freshness Scout", desc:"Share 20 reports", threshold:20, color:"#00796B",
+    Svg: ({ u }: { u: boolean }) => (
+      <svg viewBox="0 0 100 100" width="100%" height="100%">
+        <circle cx="50" cy="50" r="46" fill={u?"#E0F2F1":"#e8e8e8"} stroke={u?"#00796B":"#b0b0b0"} strokeWidth="3"/>
+        <circle cx="50" cy="50" r="40" fill="none" stroke={u?"#80CBC4":"#c8c8c8"} strokeWidth="2" strokeDasharray="4 3"/>
+        <circle cx="50" cy="50" r="18" fill={u?"#B2DFDB":"#d8d8d8"} stroke={u?"#00796B":"#a0a0a0"} strokeWidth="2.5"/>
+        <path d="M38 50 L46 58 L63 40" fill="none" stroke={u?"#00796B":"#909090"} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M62 28 Q72 22 74 32 Q64 34 62 28Z" fill={u?"#4CAF50":"#c0c0c0"}/>
+        <path d="M62 28 Q68 28 74 32" fill="none" stroke={u?"#2E7D32":"#a0a0a0"} strokeWidth="1.2" strokeLinecap="round"/>
+        {u && <><text x="12" y="22" fontSize="9" fill="#4DB6AC">✦</text><text x="74" y="19" fontSize="7" fill="#00796B">✦</text></>}
+      </svg>
+    ),
+  },
+  {
+    id:"local", label:"Local Guide", desc:"Share 15 reports", threshold:15, color:"#0288D1",
     Svg: ({ u }: { u: boolean }) => (
       <svg viewBox="0 0 100 100" width="100%" height="100%">
         <circle cx="50" cy="50" r="46" fill={u?"#E1F5FE":"#e8e8e8"} stroke={u?"#0288D1":"#b0b0b0"} strokeWidth="3"/>
@@ -154,7 +222,7 @@ const BADGES = [
     ),
   },
   {
-    id:"mvp", label:"Community MVP", desc:"Upload 25 photos", threshold:25, color:"#F9A825",
+    id:"mvp", label:"Community MVP", desc:"Share 25 reports", threshold:25, color:"#F9A825",
     Svg: ({ u }: { u: boolean }) => (
       <svg viewBox="0 0 100 100" width="100%" height="100%">
         <circle cx="50" cy="50" r="46" fill={u?"#FFF8E1":"#e8e8e8"} stroke={u?"#F9A825":"#b0b0b0"} strokeWidth="3.5"/>
@@ -174,7 +242,7 @@ const BADGES = [
     ),
   },
   {
-    id:"hero", label:"Neighborhood Hero", desc:"Upload 50 photos", threshold:50, color:"#C62828",
+    id:"hero", label:"Neighborhood Hero", desc:"Share 50 reports", threshold:50, color:"#C62828",
     Svg: ({ u }: { u: boolean }) => (
       <svg viewBox="0 0 100 100" width="100%" height="100%">
         <circle cx="50" cy="50" r="46" fill={u?"#FFEBEE":"#e8e8e8"} stroke={u?"#C62828":"#b0b0b0"} strokeWidth="3"/>
@@ -191,7 +259,7 @@ const BADGES = [
     ),
   },
   {
-    id:"champ", label:"Food Champion", desc:"Upload 100 photos", threshold:100, color:"#2E7D32",
+    id:"champ", label:"Food Champion", desc:"Share 100 reports", threshold:100, color:"#2E7D32",
     Svg: ({ u }: { u: boolean }) => (
       <svg viewBox="0 0 100 100" width="100%" height="100%">
         <circle cx="50" cy="50" r="46" fill={u?"#E8F5E9":"#e8e8e8"} stroke={u?"#2E7D32":"#b0b0b0"} strokeWidth="3"/>
@@ -209,7 +277,7 @@ const BADGES = [
     ),
   },
   {
-    id:"legend", label:"Community Legend", desc:"Upload 200 photos", threshold:200, color:"#6A1B9A",
+    id:"legend", label:"Community Legend", desc:"Share 200 reports", threshold:200, color:"#6A1B9A",
     Svg: ({ u }: { u: boolean }) => (
       <svg viewBox="0 0 100 100" width="100%" height="100%">
         <circle cx="50" cy="50" r="46" fill={u?"#F3E5F5":"#e8e8e8"} stroke={u?"#6A1B9A":"#b0b0b0"} strokeWidth="3"/>
@@ -284,7 +352,7 @@ function BadgeStrip({ count }: { count: number }) {
             <span>Progress to {next.label}</span><span>{count}/{next.threshold}</span>
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full">
-            <div className="h-full rounded-full bg-gradient-to-r from-orange-400 to-pink-400 transition-all duration-500"
+            <div className="h-full rounded-full bg-purple-500 transition-all duration-500"
               style={{ width: `${Math.min(100,(count/next.threshold)*100)}%` }} />
           </div>
         </div>
@@ -599,7 +667,7 @@ export function CommunityHubPage() {
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
   const [reports, setReports] = useState<CommunityReport[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [userCount, setUserCount] = useState(3);
+  const [userCount, setUserCount] = useState(13);
 
   // Analyst-only state
   const [activeTab, setActiveTab] = useState<ActiveTab>("reports");
@@ -696,8 +764,8 @@ export function CommunityHubPage() {
             </p>
           </div>
           <button onClick={() => setModalOpen(true)}
-            className="ml-auto flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold text-sm px-5 py-2.5 rounded-full transition-colors shrink-0">
-            <Upload className="w-4 h-4" />
+            className="ml-auto flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-base px-6 py-3 rounded-xl shadow-md transition-colors shrink-0">
+            <Upload className="w-5 h-5" />
             Add Report
           </button>
         </div>

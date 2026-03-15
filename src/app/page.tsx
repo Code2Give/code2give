@@ -12,11 +12,10 @@ import AnalyticsPage from "@/components/pages/AnalyticsPage";
 function PageContent() {
   const { page, role } = useApp();
 
-  // Handle the "Client" persona specifically
+  // Handle the Community Member persona
   if (role === "client") {
     if (page === "map") return <FoodResourceMapPage />;
-    if (page === "community") return <CommunityHubPage />;
-    return <ClientPage />;
+    return <CommunityHubPage />;
   }
 
   // Handle all other personas (Government, Donor, Provider, Internal)

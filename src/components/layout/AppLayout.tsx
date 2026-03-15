@@ -55,8 +55,8 @@ function Sidebar({ page, setPage, collapsed, setCollapsed, role }: {
       <nav className="flex-1 overflow-y-auto p-2 mt-4">
         <div className="space-y-1">
           {navItems.map((item) => {
-            // NEW: Hide Analytics and Table for Clients
-            if (role === "client" && (item.id === "analytics" || item.id === "table")) {
+            // Hide Analytics, Table, and Overview for Community Members
+            if (role === "client" && (item.id === "analytics" || item.id === "table" || item.id === "overview")) {
               return null;
             }
 
