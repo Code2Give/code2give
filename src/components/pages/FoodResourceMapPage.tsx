@@ -68,6 +68,13 @@ const MARKER_COLORS: Record<string, string> = {
   "At Risk": "#E53935",
 };
 
+const LEGEND_MARKERS = [
+  { label: "Excellent", color: "#2E7D32", badge: "Excellent" },
+  { label: "Good",      color: "#F9A825", badge: "Good"      },
+  { label: "At Risk",   color: "#E53935", badge: "At Risk"   },
+  { label: "No data",   color: "#42A5F5", badge: null        },
+] as const;
+
 type SortOption = "default" | "distance" | "rating" | "open_now";
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "default",  label: "Default"        },
@@ -77,10 +84,10 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 ];
 
 const GAP_COLORS = [
-  { label: "Critical ≥80%",    color: "#B71C1C", min: 80 },
-  { label: "High 50–79%",      color: "#EF5350", min: 50 },
-  { label: "Moderate 20–49%",  color: "#FFB74D", min: 20 },
-  { label: "Good <20%",        color: "#C8E6C9", min: 0  },
+  { label: "Critical ≥80%",   color: "#B71C1C" },
+  { label: "High 50–79%",     color: "#EF5350" },
+  { label: "Moderate 20–49%", color: "#FFB74D" },
+  { label: "Good <20%",       color: "#C8E6C9" },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -122,10 +129,17 @@ function getZipFromFeature(feature: google.maps.Data.Feature): string {
   ).trim();
 }
 
-function ratingColor(r: number) {
-  if (r >= 2.5) return "text-green-600";
-  if (r >= 2.0) return "text-yellow-600";
-  return "text-red-600";
+// Color driven by numeric rating when available, badge as fallback
+function ratingColor(rating?: number | null, badge?: string | null) {
+  if (rating != null) {
+    if (rating >= 2.2) return "text-green-600";
+    if (rating >= 1.5) return "text-yellow-600";
+    return "text-red-600";
+  }
+  if (badge === "Excellent") return "text-green-600";
+  if (badge === "Good")      return "text-yellow-600";
+  if (badge === "At Risk")   return "text-red-600";
+  return "text-gray-400";
 }
 
 function waitColor(m: number) {
@@ -141,10 +155,10 @@ function waitLabel(m: number) {
 }
 
 function exportToCSV(rows: Pantry[], filename: string) {
-  const headers = ["Name", "Address", "Type", "Hours", "Badge", "Score", "Published"];
+  const headers = ["Name", "Address", "Type", "Hours", "Badge", "Rating", "Published"];
   const lines = rows.map(p =>
     [p.name, p.location, TYPE_LABELS[p.resourceTypeId ?? ""] ?? "",
-      resolveHours(p.hours), p.badge ?? "", p.reliabilityScore ?? "",
+      resolveHours(p.hours), p.badge ?? "", p.ratingAverage ?? "",
       p.isPublished !== false ? "Yes" : "No"]
       .map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")
   );
@@ -168,7 +182,7 @@ function Chip({ label, onRemove, color }: { label: string; onRemove: () => void;
   );
 }
 
-// ── Selected Pantry Detail Card ───────────────────────────────────────────────
+// ── Pantry Detail Card (pinned/inline) ────────────────────────────────────────
 function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => void }) {
   const mapsUrl   = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pantry.location)}`;
   const bs        = pantry.badge ? BADGE_STYLES[pantry.badge] : null;
@@ -202,16 +216,16 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
             {pantry.ratingAverage != null && (
               <div className={`flex flex-col items-center justify-center py-2.5 rounded-lg border border-transparent ${bs ? bs.bg : "bg-gray-50"}`}>
                 <div className="flex items-center gap-0.5 mb-0.5">
-                  {[1, 2, 3, 4, 5].map(i => (
+                  {[1, 2, 3].map(i => (
                     <Star key={i}
-                      className={`w-3 h-3 ${pantry.ratingAverage! >= i ? (bs ? bs.text : "text-yellow-500") : "text-gray-300"}`}
+                      className={`w-3 h-3 ${pantry.ratingAverage! >= i ? ratingColor(pantry.ratingAverage, pantry.badge).replace("text-", "text-") : "text-gray-300"}`}
                       fill={pantry.ratingAverage! >= i ? "currentColor" : "none"}
                     />
                   ))}
                 </div>
-                <span className={`text-sm font-bold ${bs ? bs.text : ratingColor(pantry.ratingAverage)}`}>
+                <span className={`text-sm font-bold ${ratingColor(pantry.ratingAverage, pantry.badge)}`}>
                   {pantry.ratingAverage.toFixed(1)}
-                  <span className="text-[10px] font-normal opacity-60">/5</span>
+                  <span className="text-[10px] font-normal opacity-60">/3</span>
                 </span>
                 <span className="text-[10px] text-gray-400 uppercase tracking-wide">
                   {pantry.reviewCount != null ? `${pantry.reviewCount.toLocaleString()} reviews` : "Rating"}
@@ -317,7 +331,7 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
           </div>
         )}
 
-        {/* Cultural + language tags */}
+        {/* Tags */}
         {((pantry.culturalTags?.length ?? 0) > 0 || (pantry.languages?.length ?? 0) > 0) && (
           <div>
             <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Tags</p>
@@ -352,7 +366,7 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
       {/* Footer CTA */}
       <div className="px-4 pb-4">
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
-          <Button variant="default" size="sm" className="w-full gap-1.5 h-8">
+          <Button variant="default" size="sm" className="w-full gap-1.5 h-8 bg-violet-500 hover:bg-violet-600 text-white font-bold">
             <MapPin className="w-3.5 h-3.5" /> Get Directions
           </Button>
         </a>
@@ -404,8 +418,8 @@ function PantryCard({ pantry, selected, distance, onSelect }: {
           </span>
         )}
         {pantry.ratingAverage != null && (
-          <span className={`flex items-center gap-1 shrink-0 font-medium ${ratingColor(pantry.ratingAverage)}`}>
-            ⭐ {pantry.ratingAverage.toFixed(1)}
+          <span className={`flex items-center gap-1 shrink-0 font-medium ${ratingColor(pantry.ratingAverage, pantry.badge)}`}>
+            ⭐ {pantry.ratingAverage.toFixed(1)}<span className="text-gray-400 font-normal">/3</span>
           </span>
         )}
       </div>
@@ -423,13 +437,13 @@ function PantryCard({ pantry, selected, distance, onSelect }: {
 
       <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-          <Button variant="default" size="sm" className="h-7 text-xs gap-1">
+          <Button variant="default" size="sm" className="h-7 text-xs gap-1 bg-violet-500 hover:bg-violet-600 text-white font-bold">
             <MapPin className="w-3 h-3" /> Get Directions
           </Button>
         </a>
         {pantry.phone && (
           <a href={`tel:${pantry.phone}`} onClick={e => e.stopPropagation()}>
-            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-gray-500">
+            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-violet-600 font-semibold">
               <Phone className="w-3 h-3" /> Call
             </Button>
           </a>
@@ -444,15 +458,18 @@ function PantryCard({ pantry, selected, distance, onSelect }: {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export function FoodResourceMapPage() {
+  // Data
   const [allPantries, setAllPantries]       = useState<Pantry[]>([]);
   const [loading, setLoading]               = useState(false);
-  const [selectedPantry, setSelectedPantry]   = useState<Pantry | null>(null);
+  const [selectedPantry, setSelectedPantry] = useState<Pantry | null>(null);
   const [selectionSource, setSelectionSource] = useState<"map" | "list" | null>(null);
   const listScrollRef = useRef<HTMLDivElement | null>(null);
 
+  // Map
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
   const [mapCenter, setMapCenter]     = useState(DEFAULT_CENTER);
 
+  // Service Gap layer
   const [showServiceGapLayer, setShowServiceGapLayer] = useState(false);
   const [zipStats, setZipStats]                       = useState<Record<string, ZipStat>>({});
   const [geoJson, setGeoJson]                         = useState<object | null>(null);
@@ -460,6 +477,7 @@ export function FoodResourceMapPage() {
   const [zipInfoWindow, setZipInfoWindow]             = useState<{ lat: number; lng: number; content: string } | null>(null);
   const dataListenerRef                               = useRef<google.maps.MapsEventListener | null>(null);
 
+  // ZIP / GPS search
   const [zipInput, setZipInput]         = useState("");
   const [zipError, setZipError]         = useState<string | null>(null);
   const [zipLoading, setZipLoading]     = useState(false);
@@ -467,6 +485,7 @@ export function FoodResourceMapPage() {
   const [radiusMiles, setRadiusMiles]   = useState(2);
   const [searchCenter, setSearchCenter] = useState<{ lat: number; lng: number } | null>(null);
 
+  // Filters
   const [showFilters, setShowFilters]   = useState(false);
   const [searchInput, setSearchInput]   = useState("");
   const [searchQuery, setSearchQuery]   = useState("");
@@ -476,6 +495,16 @@ export function FoodResourceMapPage() {
   const [openNowOnly, setOpenNowOnly]   = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "published" | "unpublished">("all");
 
+  // Legend filter — default all 3 checked
+  const [legendFilter, setLegendFilter] = useState<Set<string>>(new Set(["Excellent", "Good", "At Risk"]));
+
+  const toggleLegendFilter = (key: string) =>
+    setLegendFilter(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+
   const handleTagClick = (tag: string) => {
     if (activeTag === tag) { setActiveTag(null); setSearchQuery(""); setSearchInput(""); }
     else { setActiveTag(tag); setSearchQuery(tag); setSearchInput(tag); }
@@ -483,9 +512,10 @@ export function FoodResourceMapPage() {
 
   const activeFilterCount = [!!searchQuery, typeFilter !== "all", openNowOnly, statusFilter !== "all"].filter(Boolean).length;
 
-  // Single fetch — re-runs on keyword change
+  // ── Fetches ────────────────────────────────────────────────────────────────
+
   useEffect(() => {
-    setLoading(true); setSelectedPantry(null);
+    setLoading(true); setSelectedPantry(null); setSelectionSource(null);
     const params = new URLSearchParams();
     if (searchQuery) params.set("search", searchQuery);
     fetch(`/api/map-data?${params}`)
@@ -495,15 +525,13 @@ export function FoodResourceMapPage() {
       .finally(() => setLoading(false));
   }, [searchQuery]);
 
-  // Zip stats on mount
   useEffect(() => {
     fetch("/api/zip-stats")
       .then(r => r.json())
-      .then(d => { console.log("[ZipStats] sample keys:", Object.keys(d.zipStats ?? {}).slice(0, 5)); setZipStats(d.zipStats ?? {}); })
+      .then(d => setZipStats(d.zipStats ?? {}))
       .catch(() => {});
   }, []);
 
-  // Lazy-load GeoJSON from /public on first toggle
   useEffect(() => {
     if (!showServiceGapLayer || geoJsonLoaded) return;
     setGeoJsonLoaded(true);
@@ -513,15 +541,12 @@ export function FoodResourceMapPage() {
       .catch(err => console.error("[ZipStats] GeoJSON error:", err));
   }, [showServiceGapLayer, geoJsonLoaded]);
 
-  // Apply / remove layer
   useEffect(() => {
     if (!mapInstance) return;
     mapInstance.data.forEach(f => mapInstance.data.remove(f));
     if (dataListenerRef.current) { google.maps.event.removeListener(dataListenerRef.current); dataListenerRef.current = null; }
     setZipInfoWindow(null);
-
     if (!showServiceGapLayer || !geoJson) { mapInstance.data.setStyle({}); return; }
-
     mapInstance.data.addGeoJson(geoJson as object);
     mapInstance.data.setStyle(feature => {
       const zip  = String(getZipFromFeature(feature)).trim();
@@ -529,19 +554,22 @@ export function FoodResourceMapPage() {
       if (!stat) return { fillOpacity: 0 };
       return { fillColor: gapFillColor(stat.pctUnavailable), fillOpacity: 0.55, strokeColor: "#ffffff", strokeWeight: 1.5, strokeOpacity: 1, zIndex: 0 };
     });
-
     dataListenerRef.current = mapInstance.data.addListener("click", (e: google.maps.Data.MouseEvent) => {
       if (!e.latLng) return;
       const zip  = String(getZipFromFeature(e.feature)).trim();
       const stat = zip ? zipStats[String(zip)] : undefined;
       setZipInfoWindow({
         lat: e.latLng.lat(), lng: e.latLng.lng(),
-        content: stat ? `ZIP ${zip}: ${stat.pctUnavailable}% of resources are currently unavailable.` : `ZIP ${zip}: no service data available.`,
+        content: stat
+          ? `ZIP ${zip}: ${stat.pctUnavailable}% of resources are currently unavailable.`
+          : `ZIP ${zip}: no service data available.`,
       });
     });
   }, [showServiceGapLayer, geoJson, mapInstance, zipStats]);
 
-  // Derived
+  // ── Derived ────────────────────────────────────────────────────────────────
+  const allChecked = legendFilter.has("Excellent") && legendFilter.has("Good") && legendFilter.has("At Risk");
+
   const filteredResources = allPantries
     .filter(p => {
       if (searchCenter && distanceMiles(searchCenter.lat, searchCenter.lng, p.latitude, p.longitude) > radiusMiles) return false;
@@ -549,6 +577,10 @@ export function FoodResourceMapPage() {
       if (typeFilter !== "all" && p.resourceTypeId !== typeFilter) return false;
       if (statusFilter === "published"   && p.isPublished === false) return false;
       if (statusFilter === "unpublished" && p.isPublished !== false) return false;
+      // Legend filter — when all 3 checked show everything (default)
+      if (!allChecked && legendFilter.size > 0) {
+        if (!p.badge || !legendFilter.has(p.badge)) return false;
+      }
       return true;
     })
     .sort((a, b) => {
@@ -562,9 +594,13 @@ export function FoodResourceMapPage() {
 
   const searchedZipStat = zipInput.length === 5 ? zipStats[String(zipInput)] : undefined;
 
+  // ── Actions ────────────────────────────────────────────────────────────────
   const zoomTo = (lat: number, lng: number, miles: number) => {
-    setSearchCenter({ lat, lng }); setMapCenter({ lat, lng }); setSelectedPantry(null);
-    if (mapInstance) { mapInstance.panTo({ lat, lng }); mapInstance.setZoom(miles <= 1 ? 15 : miles <= 2 ? 14 : miles <= 5 ? 13 : 12); }
+    setSearchCenter({ lat, lng }); setMapCenter({ lat, lng }); setSelectedPantry(null); setSelectionSource(null);
+    if (mapInstance) {
+      mapInstance.panTo({ lat, lng });
+      mapInstance.setZoom(miles <= 1 ? 15 : miles <= 2 ? 14 : miles <= 5 ? 13 : 12);
+    }
   };
 
   const handleZipSearch = async () => {
@@ -601,6 +637,7 @@ export function FoodResourceMapPage() {
   const clearAllFilters = () => {
     setTypeFilter("all"); setOpenNowOnly(false); setStatusFilter("all");
     setSearchQuery(""); setSearchInput(""); setActiveTag(null);
+    setLegendFilter(new Set(["Excellent", "Good", "At Risk"]));
   };
 
   const resetAll = () => {
@@ -608,7 +645,7 @@ export function FoodResourceMapPage() {
     setSortBy("default"); setZipInfoWindow(null); handleClearSearch();
   };
 
-  // Click card in list → expand inline, no map pan
+  // Click list card → expand inline
   const handleCardSelect = (p: Pantry) => {
     if (selectedPantry?.id === p.id && selectionSource === "list") {
       setSelectedPantry(null); setSelectionSource(null);
@@ -618,19 +655,22 @@ export function FoodResourceMapPage() {
     }
   };
 
-  // Click dot on map → pin detail panel at top of list + scroll list to top
+  // Click map marker → pin at top of list
   const handleMarkerClick = (p: Pantry) => {
     if (selectedPantry?.id === p.id && selectionSource === "map") {
       setSelectedPantry(null); setSelectionSource(null);
     } else {
       setSelectedPantry(p); setSelectionSource("map");
       if (mapInstance) { mapInstance.panTo({ lat: p.latitude, lng: p.longitude }); mapInstance.setZoom(15); }
-      // Scroll list to top so the pinned panel is immediately visible
-      requestAnimationFrame(() => {
-        listScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-      });
     }
   };
+
+  // Scroll to top after React renders the pinned panel
+  useEffect(() => {
+    if (selectionSource === "map" && selectedPantry) {
+      listScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [selectedPantry, selectionSource]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -653,6 +693,7 @@ export function FoodResourceMapPage() {
       <div className="bg-white/95 backdrop-blur border border-gray-200 rounded-xl shadow-sm p-3 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
 
+          {/* ZIP input */}
           <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
             <Navigation className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
             <input type="text" inputMode="numeric" maxLength={5} placeholder="ZIP code" value={zipInput}
@@ -661,6 +702,7 @@ export function FoodResourceMapPage() {
               className="w-20 bg-transparent text-sm focus:outline-none placeholder:text-gray-400" />
           </div>
 
+          {/* Radius pills */}
           <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
             {RADIUS_OPTIONS.map(m => (
               <button key={m} onClick={() => setRadiusMiles(m)}
@@ -670,15 +712,17 @@ export function FoodResourceMapPage() {
             ))}
           </div>
 
-          <Button variant="default" size="sm" onClick={handleZipSearch} disabled={zipLoading} className="h-8 gap-1.5">
+          <Button variant="default" size="sm" onClick={handleZipSearch} disabled={zipLoading}
+            className="h-8 gap-1.5 bg-violet-500 hover:bg-violet-600 text-white font-bold">
             <Search className="w-3.5 h-3.5" /> {zipLoading ? "…" : "Search"}
           </Button>
 
           <Button variant="ghost" size="sm" onClick={handleNearMe} disabled={gpsLoading}
-            className="h-8 gap-1.5 text-indigo-600 hover:text-indigo-700 border border-indigo-200">
+            className="h-8 gap-1.5 text-violet-600 hover:text-violet-700 border border-violet-200 font-semibold">
             <LocateFixed className="w-3.5 h-3.5" /> {gpsLoading ? "Locating…" : "Near Me"}
           </Button>
 
+          {/* Service Gap toggle */}
           <button onClick={() => setShowServiceGapLayer(v => !v)}
             className={`flex items-center gap-2 h-8 px-3 rounded-lg border text-xs font-semibold transition-colors ${
               showServiceGapLayer ? "bg-[#FFD700] border-yellow-400 text-slate-900" : "bg-white border-gray-200 text-gray-600 hover:border-yellow-300"
@@ -710,11 +754,13 @@ export function FoodResourceMapPage() {
               {FOOD_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
 
-            <Button variant={showFilters || activeFilterCount > 0 ? "default" : "ghost"} size="sm"
-              onClick={() => setShowFilters(v => !v)} className="h-8 gap-1.5">
+            <Button
+              variant={showFilters || activeFilterCount > 0 ? "default" : "ghost"} size="sm"
+              onClick={() => setShowFilters(v => !v)}
+              className={`h-8 gap-1.5 font-bold ${showFilters || activeFilterCount > 0 ? "bg-violet-500 hover:bg-violet-600 text-white" : ""}`}>
               <Filter className="w-3.5 h-3.5" /> Filters
               {activeFilterCount > 0 && (
-                <span className="bg-white text-primary rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">{activeFilterCount}</span>
+                <span className="bg-white text-violet-600 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">{activeFilterCount}</span>
               )}
             </Button>
           </div>
@@ -722,6 +768,7 @@ export function FoodResourceMapPage() {
 
         {zipError && <p className="text-xs text-red-500 px-1">{zipError}</p>}
 
+        {/* Active chips */}
         {!showFilters && activeFilterCount > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {activeTag && <Chip label={`🔍 "${activeTag}"`} onRemove={() => { setActiveTag(null); setSearchQuery(""); setSearchInput(""); }} color="orange" />}
@@ -732,6 +779,7 @@ export function FoodResourceMapPage() {
           </div>
         )}
 
+        {/* Expanded filter panel */}
         {showFilters && (
           <div className="pt-2 border-t border-gray-100 space-y-3">
             <div className="flex flex-wrap gap-3 items-center">
@@ -795,8 +843,6 @@ export function FoodResourceMapPage() {
                   className="bg-transparent text-xs focus:outline-none w-full placeholder:text-gray-400" />
               </div>
             </div>
-
-            {/* ZIP service gap stat banner */}
             {searchCenter && searchedZipStat && (
               <div className={`mt-2 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 ${
                 searchedZipStat.pctUnavailable >= 80 ? "bg-red-50 text-red-700"
@@ -812,7 +858,7 @@ export function FoodResourceMapPage() {
           </div>
 
           <div ref={listScrollRef} className="flex-1 overflow-y-auto pb-3 space-y-2">
-            {/* Map-click selection — pinned at the top */}
+            {/* Map-click → pinned at top */}
             {selectedPantry && selectionSource === "map" && (
               <div className="px-3 pt-3">
                 <PantryDetailCard pantry={selectedPantry} onClose={() => { setSelectedPantry(null); setSelectionSource(null); }} />
@@ -830,7 +876,7 @@ export function FoodResourceMapPage() {
 
             {!loading && filteredResources.map(p => (
               <div key={p.id} className="px-3">
-                {/* List-click selection — expands inline */}
+                {/* List-click → expand inline */}
                 {selectedPantry?.id === p.id && selectionSource === "list" ? (
                   <PantryDetailCard pantry={p} onClose={() => { setSelectedPantry(null); setSelectionSource(null); }} />
                 ) : (
@@ -894,8 +940,8 @@ export function FoodResourceMapPage() {
                         </p>
                       )}
                       {p.ratingAverage != null && (
-                        <p className={`text-xs mt-0.5 font-medium ${ratingColor(p.ratingAverage)}`}>
-                          ⭐ {p.ratingAverage.toFixed(1)}{p.reviewCount != null ? ` (${p.reviewCount} reviews)` : ""}
+                        <p className={`text-xs mt-0.5 font-medium ${ratingColor(p.ratingAverage, p.badge)}`}>
+                          ⭐ {p.ratingAverage.toFixed(1)}/3{p.reviewCount != null ? ` (${p.reviewCount} reviews)` : ""}
                         </p>
                       )}
                       <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.location)}`}
@@ -926,19 +972,51 @@ export function FoodResourceMapPage() {
           )}
 
           {/* Floating Legend */}
-          <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-gray-200 p-3 min-w-[152px]">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Marker Quality</p>
-            {[
-              { label: "Excellent", color: "#2E7D32" },
-              { label: "Good",      color: "#F9A825" },
-              { label: "At Risk",   color: "#E53935" },
-              { label: "No data",   color: "#42A5F5" },
-            ].map(({ label, color }) => (
-              <div key={label} className="flex items-center gap-2 mb-1.5">
-                <span className="w-3 h-3 rounded-full shrink-0 border border-white shadow-sm" style={{ backgroundColor: color }} />
-                <span className="text-xs text-slate-600">{label}</span>
-              </div>
-            ))}
+          <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-gray-200 p-3 min-w-[160px]">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Marker Quality</p>
+              {!allChecked && (
+                <button onClick={() => setLegendFilter(new Set(["Excellent", "Good", "At Risk"]))}
+                  className="text-[10px] text-violet-500 hover:text-violet-700 font-semibold">
+                  Reset
+                </button>
+              )}
+            </div>
+
+            {LEGEND_MARKERS.map(({ label, color, badge }) => {
+              const key   = badge ?? "no-data";
+              const active = legendFilter.has(key);
+              const isNoData = badge === null;
+
+              // "No data" — static, not clickable
+              if (isNoData) return (
+                <div key={label} className="flex items-center gap-2 mb-1.5 px-2 py-1">
+                  <span className="w-3 h-3 rounded-full shrink-0 border border-white shadow-sm" style={{ backgroundColor: color }} />
+                  <span className="text-xs text-slate-400">{label}</span>
+                </div>
+              );
+
+              return (
+                <button key={label} onClick={() => toggleLegendFilter(key)}
+                  className={`w-full flex items-center gap-2 mb-1.5 px-2 py-1 rounded-lg transition-colors text-left ${
+                    active ? "bg-slate-100 ring-1 ring-slate-300" : "hover:bg-gray-50 opacity-60"
+                  }`}>
+                  <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                    active ? "bg-violet-500 border-violet-500" : "border-gray-300 bg-white"
+                  }`}>
+                    {active && <span className="text-white text-[9px] font-bold leading-none">✓</span>}
+                  </span>
+                  <span className="w-3 h-3 rounded-full shrink-0 border border-white shadow-sm" style={{ backgroundColor: color }} />
+                  <span className={`text-xs font-semibold ${active ? "text-slate-900" : "text-slate-400"}`}>{label}</span>
+                </button>
+              );
+            })}
+
+            {!allChecked && legendFilter.size > 0 && (
+              <p className="text-[10px] text-violet-500 mt-1 text-center">
+                {filteredResources.length} result{filteredResources.length !== 1 ? "s" : ""}
+              </p>
+            )}
 
             {showServiceGapLayer && (
               <>
