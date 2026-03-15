@@ -8,9 +8,15 @@ import { DataTablePage } from "@/components/pages/DataTablePage";
 import { ClientPage } from "@/components/pages/ClientPage";
 import { CommunityHubPage } from "@/components/pages/CommunityReportsPage";
 import AnalyticsPage from "@/components/pages/AnalyticsPage";
+import { ClientPage } from "@/components/pages/ClientPage";
 
 function PageContent() {
   const { page, role } = useApp();
+
+  if (role === "client") {
+    if (page === "map") return <FoodResourceMapPage />;
+    return <ClientPage />;
+  }
 
   // 1. Handle the "Client" persona specifically
   if (role === "client") {
