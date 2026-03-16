@@ -404,18 +404,29 @@ export function FoodResourceMapPage() {
   const handleZipSearch = async () => {
     const zip = zipInput.trim();
     if (!/^\d{5}$/.test(zip)) { setZipError("Enter a valid 5-digit ZIP."); return; }
+    
+    // Warn if no local stats, but don't block — still pan the map
     const known = zipStats[zip];
-    if (!known) { setZipError("No pantry data found for that ZIP code."); return; }
-    setZipError(null); setZipLoading(true);
+    if (!known) setZipError("No service data for that ZIP, but panning anyway.");
+    else setZipError(null);
+    
+    setZipLoading(true);
     try {
-      const res  = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?components=postal_code:${zip}|country:US&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`);
-      const data = await res.json();
-      if (data.status !== "OK" || !data.results[0]) { setZipError("Could not locate that ZIP on the map."); return; }
-      const { lat, lng } = data.results[0].geometry.location;
-      zoomTo(lat, lng, radiusMiles);
-    } catch { setZipError("Could not look up ZIP."); }
-    finally { setZipLoading(false); }
-  };
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?postalcode=${zip}&countrycodes=us&format=json&limit=1`,
+      { headers: { "Accept-Language": "en", "User-Agent": "FoodResourceMap/1.0" } }
+    );
+    const data = await res.json();
+    if (!data.length) { setZipError("Could not locate that ZIP on the map."); return; }
+    const lat = parseFloat(data[0].lat);
+    const lng = parseFloat(data[0].lon); // Nominatim uses "lon", not "lng"
+    zoomTo(lat, lng, radiusMiles);
+  } catch {
+    setZipError("Could not look up ZIP.");
+  } finally {
+    setZipLoading(false);
+  }
+};
 
   const handleNearMe = () => {
     if (!navigator.geolocation) { setZipError("Geolocation not supported."); return; }
