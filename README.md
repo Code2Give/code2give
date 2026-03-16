@@ -796,7 +796,7 @@ If `GEMINI_API_KEY` is not set, the feedback classifier falls back to keyword-ba
 
 ## Deployment
 
-This project is deployed and live on Vercel: [Lemonaid live site](https://lemonaid-nine.vercel.app/).
+This project is deployed and live on Vercel: [LemonAid live site](https://lemonaid-nine.vercel.app/).
 
 ---
 
