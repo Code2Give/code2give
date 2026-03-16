@@ -72,7 +72,7 @@ export function PantryCard({ pantry, selected, distance, onSelect }: {
 
       <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-          <Button variant="default" size="sm" className="h-7 text-xs gap-1 !bg-violet-600 hover:!bg-violet-500 !text-white !font-bold">
+          <Button variant="default" size="sm" className="h-7 text-xs gap-1 bg-violet-600! hover:bg-violet-500! text-white! font-bold!">
             <MapPin className="w-3 h-3" /> Get Directions
           </Button>
         </a>

@@ -699,7 +699,7 @@ export function FoodResourceMapPage() {
               ))}
             </div>
 
-            <Button variant="default" size="sm" onClick={handleZipSearch} disabled={zipLoading} className="h-8 gap-1.5 !bg-violet-600 hover:!bg-violet-500 !text-white !font-bold">
+            <Button variant="default" size="sm" onClick={handleZipSearch} disabled={zipLoading} className="h-8 gap-1.5 bg-violet-600! hover:bg-violet-500! text-white! font-bold!">
               <Search className="w-3.5 h-3.5" /> {zipLoading ? "…" : "Search"}
             </Button>
 
@@ -779,7 +779,7 @@ export function FoodResourceMapPage() {
               </select>
 
               <Button variant={showFilters || activeFilterCount > 0 ? "default" : "ghost"} size="sm"
-                onClick={() => setShowFilters(v => !v)} className={`h-8 gap-1.5 ${showFilters || activeFilterCount > 0 ? "!bg-violet-600 hover:!bg-violet-500 !text-white !font-bold" : ""}`}>
+                onClick={() => setShowFilters(v => !v)} className={`h-8 gap-1.5 ${showFilters || activeFilterCount > 0 ? "bg-violet-600! hover:bg-violet-500! text-white! font-bold!" : ""}`}>
                 <Filter className="w-3.5 h-3.5" /> Filters
                 {activeFilterCount > 0 && (
                   <span className="bg-white text-primary rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">{activeFilterCount}</span>
