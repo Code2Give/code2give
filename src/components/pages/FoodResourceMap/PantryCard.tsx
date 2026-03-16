@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, Phone, Navigation, Timer } from "lucide-react";
+import { MapPin, Phone, Navigation, Timer, Check } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { Pantry } from "./types";
 import { BADGE_STYLES, TYPE_LABELS } from "./constants";
@@ -83,8 +83,15 @@ export function PantryCard({ pantry, selected, distance, onSelect }: {
             </Button>
           </a>
         )}
-        <span className={`ml-auto text-[10px] font-medium ${pantry.isPublished !== false ? "text-green-600" : "text-gray-400"}`}>
-          {pantry.isPublished !== false ? "✓ Published" : "Unpublished"}
+        <span className={`ml-auto inline-flex items-center gap-0.5 text-[10px] font-medium whitespace-nowrap ${pantry.isPublished !== false ? "text-green-600" : "text-gray-400"}`}>
+          {pantry.isPublished !== false ? (
+            <>
+              <Check className="w-3 h-3 shrink-0" />
+              <span>Published</span>
+            </>
+          ) : (
+            <span>Unpublished</span>
+          )}
         </span>
       </div>
     </div>

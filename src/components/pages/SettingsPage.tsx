@@ -1,7 +1,7 @@
 "use client";
 
 import { useApp } from "@/components/layout/AppLayout";
-import { User, Bell, Shield, Database } from "lucide-react";
+import { User, Bell, Shield, Database, Users } from "lucide-react";
 
 const roleLabels: Record<string, string> = {
   internal: "Lemontree Team",
@@ -9,6 +9,27 @@ const roleLabels: Record<string, string> = {
   donor: "Donor / Foundation",
   provider: "Food Provider",
 };
+
+const teamMembers = [
+  "Lakshita Madhavan",
+  "Gnana Varsita Chakka",
+  "Yash Chennawar",
+  "Atqiya Ahmed",
+  "Suraj Chaudhary",
+  "Saim Meher",
+  "Ariel Miranda",
+  "Shohislombek (King) Solijonov",
+  "Maya Doron-Repa",
+];
+
+const sortedTeamMembers = [...teamMembers].sort((left, right) => {
+  const leftParts = left.trim().split(/\s+/);
+  const rightParts = right.trim().split(/\s+/);
+  const leftLastName = leftParts[leftParts.length - 1] ?? left;
+  const rightLastName = rightParts[rightParts.length - 1] ?? right;
+
+  return leftLastName.localeCompare(rightLastName) || left.localeCompare(right);
+});
 
 export function SettingsPage() {
   const { role } = useApp();
@@ -82,6 +103,33 @@ export function SettingsPage() {
         </div>
       </div>
 
+      {/* Team */}
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3">
+            <Users className="w-5 h-5 text-[#7C3AED]" />
+            <div>
+              <h3 className="text-gray-900">Built by Team 9</h3>
+              <p className="text-sm text-gray-500">Morgan Stanley Code to Give 2026</p>
+            </div>
+          </div>
+          <span className="shrink-0 rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 border border-violet-100">
+            {teamMembers.length} members
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {sortedTeamMembers.map((member) => (
+            <span
+              key={member}
+              className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-800"
+            >
+              {member}
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* System Info */}
       <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center gap-3 mb-4">
@@ -91,11 +139,11 @@ export function SettingsPage() {
         <div className="space-y-2 text-sm text-gray-500">
           <div className="flex justify-between">
             <span>App</span>
-            <span className="text-gray-700">Lemontree InsightEngine v1.0</span>
+            <span className="text-gray-700">LemonAid v1.0</span>
           </div>
           <div className="flex justify-between">
             <span>Stack</span>
-            <span className="text-gray-700">Next.js 16 · Prisma · PostgreSQL · Gemini AI</span>
+            <span className="text-gray-700">Next.js · Prisma · Supabase · Gemini AI · PyTorch</span>
           </div>
           <div className="flex justify-between">
             <span>Built for</span>
