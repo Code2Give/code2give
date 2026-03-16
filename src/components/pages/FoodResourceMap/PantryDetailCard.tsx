@@ -186,7 +186,7 @@ export function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose:
 
       <div className="px-4 pb-4">
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
-          <Button variant="default" size="sm" className="w-full gap-1.5 h-8 !bg-violet-600 hover:!bg-violet-500 !text-white !font-bold">
+          <Button variant="default" size="sm" className="w-full gap-1.5 h-8 bg-violet-600! hover:bg-violet-500! text-white! font-bold!">
             <MapPin className="w-3.5 h-3.5" /> Get Directions
           </Button>
         </a>
